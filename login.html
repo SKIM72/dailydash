@@ -158,17 +158,12 @@
             document.getElementById('update-password-view').classList.add('hidden-view');
             document.getElementById(viewName + '-view').classList.remove('hidden-view');
         }
-
         function togglePassword(inputId, icon) {
             const input = document.getElementById(inputId);
             if (input.type === 'password') {
-                input.type = 'text'; 
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash'); 
+                input.type = 'text'; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); 
             } else {
-                input.type = 'password'; 
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye'); 
+                input.type = 'password'; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); 
             }
         }
     </script>
