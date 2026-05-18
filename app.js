@@ -1,4 +1,63 @@
+// ✅ 커스텀 알림/확인 모달을 호출하는 전역 함수
+window.showAlert = (message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('custom-alert-modal');
+        const msgEl = document.getElementById('alert-message');
+        const okBtn = document.getElementById('alert-ok-btn');
+        
+        if(!modal || !msgEl || !okBtn) { alert(message); resolve(); return; }
+        
+        msgEl.innerHTML = message.replace(/\n/g, '<br>');
+        modal.classList.remove('hidden-view');
+        
+        const handleOk = () => {
+            modal.classList.add('hidden-view');
+            okBtn.removeEventListener('click', handleOk);
+            resolve();
+        };
+        okBtn.addEventListener('click', handleOk);
+    });
+};
+
+window.showConfirm = (message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('custom-confirm-modal');
+        const msgEl = document.getElementById('confirm-message');
+        const yesBtn = document.getElementById('confirm-yes-btn');
+        const noBtn = document.getElementById('confirm-no-btn');
+        
+        if(!modal || !msgEl || !yesBtn || !noBtn) { resolve(confirm(message)); return; }
+        
+        msgEl.innerHTML = message.replace(/\n/g, '<br>');
+        modal.classList.remove('hidden-view');
+        
+        const cleanUp = () => {
+            modal.classList.add('hidden-view');
+            yesBtn.removeEventListener('click', handleYes);
+            noBtn.removeEventListener('click', handleNo);
+        };
+        
+        const handleYes = () => { cleanUp(); resolve(true); };
+        const handleNo = () => { cleanUp(); resolve(false); };
+        
+        yesBtn.addEventListener('click', handleYes);
+        noBtn.addEventListener('click', handleNo);
+    });
+};
+
+// -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+
+    // ✅ [PWA 추가] 서비스 워커 등록 (가장 먼저 실행)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
     
     // 1. Supabase 초기화
     const SUPABASE_URL = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
@@ -23,13 +82,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthPicker = document.getElementById('currentMonth');
     const monthlyTableBody = document.getElementById('monthlyTableBody');
 
+    const myPageBtn = document.getElementById('myPageBtn');
+    const myPageModal = document.getElementById('myPageModal');
+    const closeMyPage = document.getElementById('closeMyPage');
+    const loggedInEmail = document.getElementById('loggedInEmail');
+    const superUserPanel = document.getElementById('superUserPanel');
+    const approvalListBody = document.getElementById('approvalListBody');
+
     if (!datePicker || !tabDaily || !tableBody) return;
 
     // 3. 앱 초기화
     async function init() {
-        // 세션 체크 후 데이터 바인딩 시작
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return; // 세션이 없으면 위 헤드 보호막 스크립트가 튕구므로 중단
+        if (!session) return; 
 
         const today = new Date().toISOString().split('T')[0];
         datePicker.value = today;
@@ -40,10 +105,76 @@ document.addEventListener('DOMContentLoaded', () => {
         tabDaily.addEventListener('click', () => switchTab('daily'));
         tabMonthly.addEventListener('click', () => switchTab('monthly'));
 
+        if (myPageBtn && myPageModal && closeMyPage) {
+            myPageBtn.addEventListener('click', () => {
+                loggedInEmail.textContent = session.user.email;
+                myPageModal.classList.remove('hidden-view');
+                
+                if (session.user.email === 'eowert72@gmail.com') {
+                    superUserPanel.classList.remove('hidden-view');
+                    loadApprovalList();
+                } else {
+                    superUserPanel.classList.add('hidden-view');
+                }
+            });
+            
+            closeMyPage.addEventListener('click', () => {
+                myPageModal.classList.add('hidden-view');
+            });
+        }
+
         loadDailyData(today);
     }
 
-    // [일일 내역 탭] 관련 로직
+    async function loadApprovalList() {
+        if (!approvalListBody) return;
+        approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 대기 명단 구성 중...</td></tr>';
+        
+        const { data: list, error } = await supabase
+            .from('user_approvals')
+            .select('*')
+            .eq('is_approved', false)
+            .order('created_at', { ascending: true });
+            
+        if (error) {
+            approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg" style="color:var(--danger);">데이터를 로드하지 못했습니다.</td></tr>';
+            return;
+        }
+        
+        if (!list || list.length === 0) {
+            approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg" style="padding: 20px !important;">대기 중인 신청 계정이 없습니다.</td></tr>';
+            return;
+        }
+        
+        approvalListBody.innerHTML = '';
+        list.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="padding: 12px; font-weight: 500; text-align:left;">${item.email}</td>
+                <td style="padding: 12px; text-align: center;">
+                    <button onclick="approveUser('${item.email}')" class="btn-approve"><i class="fas fa-user-check"></i> 가입 승인</button>
+                </td>
+            `;
+            approvalListBody.appendChild(row);
+        });
+    }
+
+    window.approveUser = async (targetEmail) => {
+        if (!(await window.showConfirm(`${targetEmail} 계정의 DailyDash 접속 권한을 승인하시겠습니까?`))) return;
+        
+        const { error } = await supabase
+            .from('user_approvals')
+            .update({ is_approved: true })
+            .eq('email', targetEmail);
+            
+        if (error) {
+            await window.showAlert("승인 처리 중 오류 발생: " + error.message);
+        } else {
+            await window.showAlert(`${targetEmail} 계정의 정산 장부 접근 승인이 완료되었습니다.`);
+            loadApprovalList(); 
+        }
+    };
+
     async function loadDailyData(date) {
         try {
             tableBody.innerHTML = '<tr><td colspan="9" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 데이터를 불러오는 중...</td></tr>';
@@ -134,26 +265,25 @@ document.addEventListener('DOMContentLoaded', () => {
             ['count','cashIn','cashOut','cardIn'].forEach(id => document.getElementById(id).value = 0);
             loadDailyData(date);
         } else {
-            alert("저장 실패: " + error.message);
+            await window.showAlert("저장 실패: " + error.message);
         }
     });
 
     window.deleteTransaction = async (id) => {
-        if(!confirm("이 내역을 삭제하시겠습니까?")) return;
+        if(!(await window.showConfirm("이 내역을 삭제하시겠습니까?"))) return;
         const { error } = await supabase.from('transactions').delete().eq('id', id);
         if(!error) {
             loadDailyData(datePicker.value);
         } else {
-            alert("삭제 실패: " + error.message);
+            await window.showAlert("삭제 실패: " + error.message);
         }
     };
 
     saveNoteBtn.addEventListener('click', async () => {
         const { error } = await supabase.from('daily_notes').upsert({ note_date: datePicker.value, special_note: noteInput.value });
-        if(!error) alert("특기사항이 저장되었습니다.");
+        if(!error) await window.showAlert("특기사항이 저장되었습니다.");
     });
 
-    // [월간 통계 탭] 관련 로직
     function switchTab(tabName) {
         if (tabName === 'daily') {
             tabDaily.classList.add('active');
@@ -244,3 +374,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     init();
 });
+
+// ✅ 메인 화면 로그아웃
+window.logout = async () => {
+    if (await window.showConfirm("로그아웃 하시겠습니까?")) {
+        const SUPABASE_URL = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxid2xvZG5ndXd1dWRiYmFxbXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg2NjQsImV4cCI6MjA5NDYwNDY2NH0.YJ3zbTthU2aGDCAfnk1GWeuI2nj4VM8qLAKXyaNITPQ';
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        await sb.auth.signOut();
+        window.location.replace('login.html');
+    }
+};
