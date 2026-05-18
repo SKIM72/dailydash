@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DailyDash - 로그인</title>
+    <link rel="icon" href="favicon.jpg" type="image/jpeg">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 칙칙함을 없앤 화사한 그라데이션 배경 */
+        .login-body-wrapper {
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            padding: 20px;
+            font-family: var(--font-family);
+        }
+        .login-card {
+            width: 100%; max-width: 420px;
+            background: #ffffff;
+            padding: 45px 35px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(255,255,255,0.5);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-logo {
+            width: 72px; height: 72px; object-fit: contain;
+            border-radius: 50%; box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border); margin-bottom: 16px;
+            background: white; padding: 4px;
+        }
+        .login-card h2 {
+            font-size: 1.6rem; font-weight: 700; color: var(--text-main);
+            margin-bottom: 8px; letter-spacing: -0.5px;
+        }
+        .login-subtitle {
+            color: var(--text-muted); font-size: 0.95rem; margin-bottom: 32px;
+        }
+        
+        /* 유틸리티 기능 (체크박스 및 텍스트 링크) */
+        .auth-options {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; font-size: 0.9rem;
+        }
+        .remember-me {
+            display: flex; align-items: center; gap: 8px; color: var(--text-muted); cursor: pointer;
+        }
+        .text-link {
+            color: var(--primary); font-weight: 600; text-decoration: none; cursor: pointer; transition: 0.2s;
+        }
+        .text-link:hover { color: var(--primary-hover); text-decoration: underline; }
+        
+        /* 뷰 전환 숨김 처리 */
+        .hidden-view { display: none !important; }
+    </style>
+</head>
+<body class="login-body-wrapper">
+
+    <div class="login-card">
+        <img src="icon.jpeg" alt="DailyDash 로고" class="login-logo">
+        
+        <div id="login-view">
+            <h2>DailyDash 로그인</h2>
+            <p class="login-subtitle">가게 정산 시스템 접속을 위해 인증해 주세요.</p>
+            
+            <form id="loginForm">
+                <div class="form-group" style="text-align: left;">
+                    <label for="loginEmail"><i class="far fa-envelope"></i> 이메일 주소</label>
+                    <input type="email" id="loginEmail" placeholder="example@email.com" required>
+                </div>
+                
+                <div class="form-group" style="text-align: left; margin-bottom: 12px;">
+                    <label for="loginPassword"><i class="fas fa-lock"></i> 비밀번호</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required>
+                </div>
+
+                <div class="auth-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberEmail"> 아이디 저장
+                    </label>
+                    <a class="text-link" onclick="toggleView('reset')">비밀번호 찾기</a>
+                </div>
+                
+                <button type="submit" class="btn-submit" id="loginBtn" style="margin-bottom: 20px;">
+                    <i class="fas fa-sign-in-alt"></i> 로그인하기
+                </button>
+            </form>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">
+                아직 계정이 없으신가요? <a class="text-link" onclick="toggleView('signup')">회원가입</a>
+            </div>
+        </div>
+
+        <div id="signup-view" class="hidden-view">
+            <h2>관리자 회원가입</h2>
+            <p class="login-subtitle">새로운 DailyDash 계정을 생성합니다.</p>
+            
+            <form id="signupForm">
+                <div class="form-group" style="text-align: left;">
+                    <label for="signupEmail"><i class="far fa-envelope"></i> 사용할 이메일</label>
+                    <input type="email" id="signupEmail" placeholder="example@email.com" required>
+                </div>
+                
+                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+                    <label for="signupPassword"><i class="fas fa-lock"></i> 비밀번호 (6자 이상)</label>
+                    <input type="password" id="signupPassword" placeholder="••••••••" required minlength="6">
+                </div>
+                
+                <button type="submit" class="btn-submit" id="signupBtn" style="margin-bottom: 20px;">
+                    <i class="fas fa-user-plus"></i> 가입하기
+                </button>
+            </form>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">
+                이미 계정이 있으신가요? <a class="text-link" onclick="toggleView('login')">로그인으로 돌아가기</a>
+            </div>
+        </div>
+
+        <div id="reset-view" class="hidden-view">
+            <h2>비밀번호 찾기</h2>
+            <p class="login-subtitle">가입하신 이메일로 비밀번호 재설정 링크를 보내드립니다.</p>
+            
+            <form id="resetForm">
+                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+                    <label for="resetEmail"><i class="far fa-envelope"></i> 가입한 이메일 주소</label>
+                    <input type="email" id="resetEmail" placeholder="example@email.com" required>
+                </div>
+                
+                <button type="submit" class="btn-submit" id="resetBtn" style="margin-bottom: 20px;">
+                    <i class="fas fa-paper-plane"></i> 재설정 링크 발송
+                </button>
+            </form>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">
+                <a class="text-link" onclick="toggleView('login')"><i class="fas fa-arrow-left"></i> 로그인으로 돌아가기</a>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // 뷰 전환을 위한 간단한 함수
+        function toggleView(viewName) {
+            document.getElementById('login-view').classList.add('hidden-view');
+            document.getElementById('signup-view').classList.add('hidden-view');
+            document.getElementById('reset-view').classList.add('hidden-view');
+            
+            document.getElementById(viewName + '-view').classList.remove('hidden-view');
+        }
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

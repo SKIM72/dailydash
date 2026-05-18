@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DailyDash - 매출 일계표</title>
+    
+    <link rel="icon" href="favicon.jpg" type="image/jpeg">
+    
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (async () => {
+            const url = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
+            const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxid2xvZG5ndXd1dWRiYmFxbXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg2NjQsImV4cCI6MjA5NDYwNDY2NH0.YJ3zbTthU2aGDCAfnk1GWeuI2nj4VM8qLAKXyaNITPQ';
+            const sb = window.supabase.createClient(url, key);
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) window.location.replace('login.html');
+        })();
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo-title">
+                <img src="icon.jpeg" alt="DailyDash 로고" class="header-icon">
+                <h1>DailyDash</h1>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <nav class="tab-menu">
+                    <button id="tabDaily" class="tab-btn active"><i class="fas fa-edit"></i> 일일 내역</button>
+                    <button id="tabMonthly" class="tab-btn"><i class="fas fa-chart-line"></i> 월간 통계</button>
+                </nav>
+                
+                <button onclick="window.logout()" class="btn-danger" style="padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
+                    <i class="fas fa-sign-out-alt"></i> 로그아웃
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content" id="viewDaily">
+            <section class="input-section">
+                <div class="date-picker-wrap" style="margin-bottom: 24px;">
+                    <label for="currentDate"><i class="far fa-calendar-alt"></i> 기준일 선택</label>
+                    <input type="date" id="currentDate" required>
+                </div>
+
+                <div class="section-header">
+                    <h2><i class="fas fa-plus-circle"></i> 내역 추가</h2>
+                </div>
+                
+                <form id="transactionForm">
+                    <div class="form-group">
+                        <label for="desc">적요 (현금 & 카드)</label>
+                        <input type="text" id="desc" placeholder="예: 미숫가루, 돌배즙" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="count">인원</label>
+                            <input type="number" id="count" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cashIn">현금 수입</label>
+                            <input type="number" id="cashIn" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="cardIn">카드 수입</label>
+                            <input type="number" id="cardIn" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="cashOut">현금 지출</label>
+                        <input type="number" id="cashOut" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="remark1">비고 1</label>
+                        <input type="text" id="remark1" placeholder="추가 내용">
+                    </div>
+                    <div class="form-group">
+                        <label for="remark2">비고 2</label>
+                        <input type="text" id="remark2" placeholder="담당자 이름 등">
+                    </div>
+                    <button type="submit" class="btn-submit"><i class="fas fa-check"></i> 입력하기</button>
+                </form>
+            </section>
+
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-list-ul"></i> 오늘의 내역</h2>
+                </div>
+                
+                <div class="table-container">
+                    <table id="transactionTable">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>적요</th>
+                                <th>인원</th>
+                                <th>수입(현금)</th>
+                                <th>현금지출</th>
+                                <th>카드수입</th>
+                                <th>비고1</th>
+                                <th>비고2</th>
+                                <th>관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="9" class="empty-msg">데이터를 불러오는 중...</td></tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="2">합계</td>
+                                <td id="totalCount">0</td>
+                                <td id="totalCashIn">0</td>
+                                <td id="totalCashOut">0</td>
+                                <td id="totalCardIn">0</td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <div class="daily-note-section">
+                    <label for="dailyNote"><i class="fas fa-thumbtack"></i> 일일 특기사항</label>
+                    <textarea id="dailyNote" rows="3" placeholder="오늘의 특기사항을 입력하세요 (예: 콩 수확)"></textarea>
+                    <button id="saveNoteBtn" class="btn-secondary"><i class="fas fa-save"></i> 특기사항 저장</button>
+                </div>
+            </section>
+        </main>
+
+        <main class="main-content" id="viewMonthly" style="display: none; flex-direction: column;">
+            <section class="dashboard-section" style="width: 100%;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;"><i class="fas fa-chart-pie"></i> 월간 요약</h2>
+                    <input type="month" id="currentMonth" class="month-picker">
+                </div>
+                
+                <div class="summary-cards">
+                    <div class="card card-primary">
+                        <h3>총 매출 (현금+카드)</h3>
+                        <p id="monthTotalSales" class="amount">0</p>
+                    </div>
+                    <div class="card card-success">
+                        <h3>현금 누적</h3>
+                        <p id="monthTotalCash" class="amount">0</p>
+                    </div>
+                    <div class="card card-warning">
+                        <h3>카드 누적</h3>
+                        <p id="monthTotalCard" class="amount">0</p>
+                    </div>
+                    <div class="card card-purple">
+                        <h3>총 방문 인원</h3>
+                        <p id="monthTotalCount" class="amount count">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-section" style="width: 100%;">
+                <div class="section-header">
+                    <h2><i class="fas fa-table"></i> 일자별 누적 현황</h2>
+                </div>
+                <div class="table-container">
+                    <table id="monthlyTable">
+                        <thead>
+                            <tr>
+                                <th>날짜</th>
+                                <th>일 인원</th>
+                                <th>인원 누적</th>
+                                <th>일 현금</th>
+                                <th>현금 누적</th>
+                                <th>일 카드</th>
+                                <th>카드 누적</th>
+                                <th>일 합계</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monthlyTableBody">
+                            <tr><td colspan="8" class="empty-msg">데이터가 없습니다.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
