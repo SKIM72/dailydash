@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v2'; // 버전을 v2로 올려줍니다.
+const CACHE_NAME = 'dailydash-v3';
 const urlsToCache = [
   '/dailydash/',
   '/dailydash/index.html',
