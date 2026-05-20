@@ -143,7 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
             await supabase.from('transactions').delete().lt('deleted_at', oneMonthAgo.toISOString());
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        // 한국/일본 시간(UTC+9) 기준으로 현재 날짜 구하기
+        const now = new Date();
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+        const kstTime = new Date(utc + (9 * 60 * 60 * 1000));
+        const today = kstTime.getFullYear() + '-' + String(kstTime.getMonth() + 1).padStart(2, '0') + '-' + String(kstTime.getDate()).padStart(2, '0');
+        
         datePicker.value = today;
         updateDateDisplay(today);
         
@@ -334,8 +339,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const lastDay = new Date(monthStr.split('-')[0], monthStr.split('-')[1], 0).getDate();
             const endDate = `${monthStr}-${lastDay}`;
 
-            const { data: txs, error } = await supabase.from('transactions').select('transaction_date, customer_count, cash_income, card_income').gte('transaction_date', startDate).lte('transaction_date', endDate).is('deleted_at', null).order('transaction_date', { ascending: true });
-            if (error) throw error;
+            let allTxs = [];
+            let fromIdx = 0;
+            const limit = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data: txs, error } = await supabase
+                    .from('transactions')
+                    .select('transaction_date, customer_count, cash_income, card_income')
+                    .gte('transaction_date', startDate)
+                    .lte('transaction_date', endDate)
+                    .is('deleted_at', null)
+                    .order('transaction_date', { ascending: true })
+                    .range(fromIdx, fromIdx + limit - 1);
+
+                if (error) throw error;
+                if (txs && txs.length > 0) allTxs = allTxs.concat(txs);
+                if (!txs || txs.length < limit) hasMore = false;
+                else fromIdx += limit;
+            }
 
             const dailySummary = {};
             for (let i = 1; i <= lastDay; i++) {
@@ -345,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let maxSales = 0; let maxSalesDay = '-';
 
-            txs.forEach(tx => {
+            allTxs.forEach(tx => {
                 const d = tx.transaction_date;
                 if (dailySummary[d]) {
                     dailySummary[d].count += (tx.customer_count || 0);
@@ -411,8 +434,26 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             totalTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 기간 데이터를 종합 분석 중...</td></tr>';
             
-            const { data: txs, error } = await supabase.from('transactions').select('transaction_date, customer_count, cash_income, card_income').gte('transaction_date', startStr).lte('transaction_date', endStr).is('deleted_at', null).order('transaction_date', { ascending: true });
-            if (error) throw error;
+            let allTxs = [];
+            let fromIdx = 0;
+            const limit = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data: txs, error } = await supabase
+                    .from('transactions')
+                    .select('transaction_date, customer_count, cash_income, card_income')
+                    .gte('transaction_date', startStr)
+                    .lte('transaction_date', endStr)
+                    .is('deleted_at', null)
+                    .order('transaction_date', { ascending: true })
+                    .range(fromIdx, fromIdx + limit - 1);
+
+                if (error) throw error;
+                if (txs && txs.length > 0) allTxs = allTxs.concat(txs);
+                if (!txs || txs.length < limit) hasMore = false;
+                else fromIdx += limit;
+            }
 
             const start = new Date(startStr);
             const end = new Date(endStr);
@@ -427,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let maxSales = 0; let maxSalesDay = '-';
 
-            txs.forEach(tx => {
+            allTxs.forEach(tx => {
                 const d = tx.transaction_date;
                 if (dailySummary[d]) {
                     dailySummary[d].count += (tx.customer_count || 0);
