@@ -87,9 +87,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const downloadExcelBtn = document.getElementById('downloadExcelBtn');
 
+    // 전역 차트 인스턴스 핸들 객체 (중복 생성 방지용)
+    let trendChartInstance = null;
+
     if (!datePicker || !tabDaily || !tableBody) return;
 
-    // 세자리 세퍼레이터 및 초기 0 제거 텍스트 플레이스홀더 제어 엔진
+    // 세자리 세퍼레이터 및 초기 0 제거 텍스트 플레이스홀절 제어 엔진
     function formatCommas(val) {
         let num = String(val).replace(/[^0-9]/g, '');
         return num ? Number(num).toLocaleString() : '';
@@ -192,6 +195,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             closeMyPage.addEventListener('click', () => myPageModal.classList.add('hidden-view'));
+        }
+
+        // 모달 닫기 바인딩 연동 추가
+        const closeDetailModal = document.getElementById('closeDetailModal');
+        if(closeDetailModal) {
+            closeDetailModal.addEventListener('click', () => {
+                document.getElementById('dailyDetailModal').classList.add('hidden-view');
+            });
         }
 
         loadDailyData(today);
@@ -332,6 +343,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 요구사항 1번: 월간 상세 현황 데이터 로드 및 모달 상세창 바인딩 로직 구현
+    async function showDayDetailPopup(dateStr) {
+        const modal = document.getElementById('dailyDetailModal');
+        const titleDate = document.getElementById('detailModalTitleDate');
+        const modalTableBody = document.getElementById('detailModalTableBody');
+        
+        if(!modal || !modalTableBody) return;
+        
+        titleDate.textContent = dateStr;
+        modalTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 해당 일자 세부 건별 명세 조회 중...</td></tr>';
+        modal.classList.remove('hidden-view');
+        
+        try {
+            const { data: list, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('transaction_date', dateStr)
+                .is('deleted_at', null)
+                .order('created_at', { ascending: true });
+                
+            if(error) throw error;
+            
+            if(!list || list.length === 0) {
+                modalTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg">해당 일자에는 등록된 상세 판매 내역이 없습니다.</td></tr>';
+                return;
+            }
+            
+            modalTableBody.innerHTML = '';
+            list.forEach((tx, idx) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${idx + 1}</td>
+                    <td style="font-weight: 500; text-align: left !important;">${tx.description || '-'}</td>
+                    <td>${(tx.customer_count || 0).toLocaleString()}명</td>
+                    <td style="color: var(--secondary); font-weight: 600;">${(tx.cash_income || 0).toLocaleString()}원</td>
+                    <td style="color: var(--danger);">${(tx.cash_expense || 0).toLocaleString()}원</td>
+                    <td style="color: #f59e0b; font-weight: 600;">${(tx.card_income || 0).toLocaleString()}원</td>
+                    <td style="color: var(--text-muted); text-align: left !important;">${tx.remark1 || ''}</td>
+                    <td style="color: var(--text-muted); text-align: left !important;">${tx.remark2 || ''}</td>
+                `;
+                modalTableBody.appendChild(row);
+            });
+        } catch (err) {
+            console.error(err);
+            modalTableBody.innerHTML = `<tr><td colspan="8" class="empty-msg" style="color: var(--danger);">명세 로드 실패 (${err.message})</td></tr>`;
+        }
+    }
+
     async function loadMonthlyData(monthStr) {
         try {
             monthlyTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 데이터를 분석하는 중...</td></tr>';
@@ -389,12 +448,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (dayData.total > maxSales) { maxSales = dayData.total; maxSalesDay = d; }
 
                 const row = document.createElement('tr');
+                // 클릭 가능한 행임을 스타일로 유추할 수 있도록 클래스 주입
+                row.classList.add('clickable-row');
                 if (dayData.total === 0) row.style.opacity = '0.5'; 
 
-                // ✅ 요구사항 2번: 웹페이지 표기 날짜에 요일 추가 (예: 2026-05-18 월)
                 const days = ['일', '월', '화', '수', '목', '금', '토'];
                 const dayName = days[new Date(d).getDay()];
-                const formattedDate = `${d} ${dayName}`;
+                const formattedDate = `${d} (${dayName})`;
 
                 row.innerHTML = `
                     <td>${formattedDate}</td>
@@ -406,6 +466,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="color:#f59e0b; font-weight:700;">${accCard.toLocaleString()}</td>
                     <td style="font-weight:700; color:var(--primary);">${dayData.total.toLocaleString()}</td>
                 `;
+                
+                // 요구사항 1번: 일자별 행 클릭 시 상세 모달을 호출하는 클릭 핸들러 동적 주입
+                row.addEventListener('click', () => {
+                    showDayDetailPopup(d);
+                });
+                
                 monthlyTableBody.appendChild(row);
             }
 
@@ -421,6 +487,121 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error(err);
             monthlyTableBody.innerHTML = `<tr><td colspan="8" class="empty-msg" style="color: var(--danger);">통계 데이터를 불러오지 못했습니다.</td></tr>`;
+        }
+    }
+
+    // 요구사항 2번: 트렌디한 통계 분석 처리를 위한 종합 시각화 및 요일 분석 엔진 탑재
+    function renderAdvancedAnalytics(dailySummary, allTxs) {
+        const sortedDates = Object.keys(dailySummary).sort();
+        const labels = sortedDates.map(d => d.substring(5)); // 'MM-DD' 포맷팅
+        
+        const cashData = [];
+        const cardData = [];
+        const customerData = [];
+        
+        // 요일별 누적 집계 데이터 공간 구성 (0: 일요일 ~ 6: 토요일)
+        const weekdaySales = [0, 0, 0, 0, 0, 0, 0];
+        const weekdayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+        let totalSalesAccum = 0;
+
+        sortedDates.forEach(d => {
+            const data = dailySummary[d];
+            cashData.push(data.cash);
+            cardData.push(data.card);
+            customerData.push(data.count);
+            
+            // 요일 정보 추출하여 가산
+            const dayIndex = new Date(d).getDay();
+            weekdaySales[dayIndex] += data.total;
+            totalSalesAccum += data.total;
+        });
+
+        // 1) 복합 다차원 추이 그래프 시각화 빌드 (Chart.js 제어)
+        const ctx = document.getElementById('totalTrendChart');
+        if (ctx) {
+            if (trendChartInstance) {
+                trendChartInstance.destroy(); // 기존 차트 자원 반환 및 초기화
+            }
+            
+            trendChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '현금 수입',
+                            data: cashData,
+                            backgroundColor: '#10b981',
+                            stack: 'combinedSales'
+                        },
+                        {
+                            label: '카드 수입',
+                            data: cardData,
+                            backgroundColor: '#f59e0b',
+                            stack: 'combinedSales'
+                        },
+                        {
+                            label: '방문 인원 (명)',
+                            data: customerData,
+                            type: 'line',
+                            borderColor: '#6366f1',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#4f46e5',
+                            fill: false,
+                            yAxisID: 'yPeopleAxis'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: {
+                            stacked: true,
+                            position: 'left',
+                            title: { display: true, text: '매출액 (원)', font: { weight: 'bold' } },
+                            ticks: { callback: value => value.toLocaleString() }
+                        },
+                        yPeopleAxis: {
+                            position: 'right',
+                            title: { display: true, text: '방문객 수 (명)', font: { weight: 'bold' } },
+                            grid: { display: false },
+                            ticks: { stepSize: 1 }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { family: 'Inter' } } }
+                    }
+                }
+            });
+        }
+
+        // 2) 요일별 기여도 게이지 분석기 UI 렌더링
+        const weekdayWrap = document.getElementById('weekdayContributionWrap');
+        if (weekdayWrap) {
+            weekdayWrap.innerHTML = '';
+            
+            weekdaySales.forEach((sales, idx) => {
+                const ratio = totalSalesAccum > 0 ? Math.round((sales / totalSalesAccum) * 100) : 0;
+                
+                const barRow = document.createElement('div');
+                barRow.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 0.9rem;";
+                
+                // 오늘 요일 강조 인덱스 정의
+                let colorHex = "#64748b";
+                if(idx === 0) colorHex = "#ef4444"; // 일요일 빨강
+                if(idx === 6) colorHex = "#3b82f6"; // 토요일 파랑
+                
+                barRow.innerHTML = `
+                    <div style="width: 55px; font-weight: 600; color: ${colorHex};">${weekdayNames[idx]}</div>
+                    <div style="flex: 1; background: var(--side-bg); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div style="width: ${ratio}%; background: var(--primary); height: 100%; border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
+                    <div style="width: 85px; text-align: right; font-weight: 700; color: var(--text-main);">${ratio}% <span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">(${Math.round(sales/10000).toLocaleString()}만)</span></div>
+                `;
+                weekdayWrap.appendChild(barRow);
+            });
         }
     }
 
@@ -489,10 +670,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const row = document.createElement('tr');
                 if (dayData.total === 0) row.style.opacity = '0.5';
 
-                // ✅ 요구사항 2번: 총 통계 웹페이지 표기 날짜에 요일 추가 (예: 2026-05-18 월)
                 const days = ['일', '월', '화', '수', '목', '금', '토'];
                 const dayName = days[new Date(d).getDay()];
-                const formattedDate = `${d} ${dayName}`;
+                const formattedDate = `${d} (${dayName})`;
 
                 row.innerHTML = `
                     <td>${formattedDate}</td>
@@ -515,6 +695,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('rangeAvgSales').textContent = Math.round(accTotal / (totalDaysCount || 1)).toLocaleString() + " 원";
             document.getElementById('rangeMaxSalesDay').textContent = maxSales > 0 ? `${maxSalesDay} (${maxSales.toLocaleString()}원)` : '-';
             document.getElementById('rangeCashRatio').textContent = accTotal > 0 ? `${Math.round((accCash / accTotal) * 100)}%` : '0%';
+
+            // 신규 시각화 함수 연동 파이프라인 배치
+            renderAdvancedAnalytics(dailySummary, allTxs);
 
         } catch (err) {
             console.error(err);
@@ -543,7 +726,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const rowData = [];
             const cells = row.querySelectorAll('th, td');
             cells.forEach(cell => {
-                // ✅ 요구사항 2번: 웹페이지 텍스트(날짜+요일)가 엑셀 파일에도 변형 없이 그대로 기록됨
                 rowData.push(cell.innerText);
             });
             wsData.push(rowData);
@@ -563,7 +745,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = parsed.r;
             const col = parsed.c;
 
-            // ✅ 요구사항 1번: 데이터 표의 테두리선을 조금 더 뚜렷하고 깔끔한 색상(#94A3B8)으로 강화 적용
             cell.s = {
                 font: { name: 'Malgun Gothic', size: 10 },
                 alignment: { vertical: 'center', horizontal: 'center' },
@@ -576,12 +757,10 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (row === 0) {
-                // ✅ 요구사항 1번: 엑셀 파일 대제목 폰트 크기 대폭 확대 (size: 16 -> 22) 및 굵게 지정
                 cell.s.font = { name: 'Malgun Gothic', size: 22, bold: true, color: { rgb: '1E293B' } };
                 cell.s.alignment = { horizontal: 'center', vertical: 'center' };
                 delete cell.s.border;
             } else if (row === 1) {
-                // ✅ 요구사항 1번: 조회 대상 기간 텍스트 우측 정렬 변경 (center -> right)
                 cell.s.font = { name: 'Malgun Gothic', size: 11, color: { rgb: '64748B' } };
                 cell.s.alignment = { horizontal: 'right', vertical: 'center' };
                 delete cell.s.border;
@@ -623,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
 
         ws['!cols'] = [
-            { wch: 18 }, // 요일이 추가되었으므로 날짜 컬럼 너비 확장 유지
+            { wch: 18 }, 
             { wch: 12 }, 
             { wch: 12 }, 
             { wch: 15 }, 

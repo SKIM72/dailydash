@@ -159,28 +159,25 @@ tbody tr:hover { background-color: var(--side-bg); }
 @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ========================================== */
-/* ✅ 1, 2번 달력 안 나오는 에러 100% 완벽 해결 로직 (CSS 트릭) */
+/* 달력 안 나오는 에러 100% 완벽 해결 로직 (CSS 트릭) */
 /* ========================================== */
 .custom-date-picker {
     position: relative; display: inline-flex; align-items: center;
     background: #ffffff; border: 1px solid var(--border); border-radius: 12px;
     padding: 12px 16px; font-size: 0.95rem; font-weight: 600; color: var(--text-main);
     box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s ease;
-    overflow: hidden; /* 내부 요소가 넘치지 않도록 차단 */
+    overflow: hidden; 
 }
 .custom-date-picker:hover { border-color: var(--primary); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08); }
 .custom-date-picker .calendar-icon { color: var(--primary); margin-right: 12px; font-size: 1.15rem; z-index: 1; pointer-events: none; }
 .custom-date-picker span { z-index: 1; pointer-events: none; }
 
-/* input을 상자 전체 크기로 맞춰 덮어버림 */
 .custom-date-picker input[type="date"],
 .custom-date-picker input[type="month"] {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     opacity: 0 !important; cursor: pointer; z-index: 10; box-sizing: border-box;
 }
 
-/* ★ 핵심: 브라우저에 숨어있는 '달력 팝업 띄우는 버튼'을 상자 크기만큼 억지로 잡아당겨 늘림 ★ */
-/* 이렇게 하면 상자 어디를 누르든 브라우저는 '달력 버튼을 눌렀다'고 인식하여 100% 팝업을 엽니다. */
 .custom-date-picker input[type="date"]::-webkit-calendar-picker-indicator,
 .custom-date-picker input[type="month"]::-webkit-calendar-picker-indicator {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -195,4 +192,19 @@ tbody tr:hover { background-color: var(--side-bg); }
     .header { padding: 12px 16px; }
     .tab-btn, #myPageBtn, .header .btn-danger { padding: 10px 14px !important; font-size: 1.1rem !important; }
     .tab-btn i, #myPageBtn i, .header .btn-danger i { margin-right: 0 !important; }
+    .analytics-dashboard-grid { grid-template-columns: 1fr !important; } /* 태블릿 이하 차트 전면 종렬 배치 */
+}
+
+/* ========================================== */
+/* 신규 디자인 요구사항 전용 보완 인젝션 스타일 피드백 */
+/* ========================================== */
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.clickable-row:hover {
+    background-color: #f0fdf4 !important; /* 연한 녹색 하이라이트로 보기 편하게 개선 */
+}
+.clickable-row:active {
+    transform: scale(0.995);
 }
