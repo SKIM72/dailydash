@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v5';
+const CACHE_NAME = 'dailydash-v10';
 const urlsToCache = [
   '/dailydash/',
   '/dailydash/index.html',
