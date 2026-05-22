@@ -164,7 +164,10 @@
 
             <section class="dashboard-section" style="width: 100%;">
                 <div class="section-header">
-                    <h2><i class="fas fa-table"></i> 일자별 누적 현황 <span style="font-size:0.85rem; font-weight:normal; color:var(--text-muted); margin-left:8px;">(행을 클릭하면 해당 일자의 건별 상세 내역이 표기됩니다)</span></h2>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <h2><i class="fas fa-table"></i> 일자별 누적 현황</h2>
+                        <span style="font-size:0.85rem; color:var(--text-muted);">(행을 클릭하면 해당 일자의 건별 상세 내역이 표기됩니다)</span>
+                    </div>
                     <button id="downloadExcelBtn" class="btn-secondary" style="margin-top:0; width:auto; padding: 8px 16px; background:#22c55e; color:white; border:none; border-radius:8px; font-weight:600;"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
                 </div>
                 <div class="table-container">
