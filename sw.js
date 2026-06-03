@@ -1,13 +1,20 @@
-const CACHE_NAME = 'dailydash-v26';
+const CACHE_NAME = 'dailydash-v27-safe-stats';
 const urlsToCache = [
-  '/dailydash/',
-  '/dailydash/index.html',
-  '/dailydash/login.html',
-  '/dailydash/style.css',
-  '/dailydash/app.js',
-  '/dailydash/auth.js',
-  '/dailydash/icon.jpeg',
-  '/dailydash/favicon.jpg'
+  './',
+  'index.html',
+  'login.html',
+  'style.css',
+  'src/app.js',
+  'src/auth.js',
+  'src/guard.js',
+  'src/services/supabaseClient.js',
+  'src/shared/modal.js',
+  'src/shared/format.js',
+  'src/shared/date.js',
+  'src/shared/dom.js',
+  'src/features/analytics.js',
+  'icon.jpeg',
+  'favicon.png'
 ];
 
 self.addEventListener('install', event => {
@@ -17,6 +24,7 @@ self.addEventListener('install', event => {
         return cache.addAll(urlsToCache);
       })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {
@@ -39,6 +47,6 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });

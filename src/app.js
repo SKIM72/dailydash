@@ -1,57 +1,37 @@
-// 커스텀 알림/확인 모달 전역 핸들러 (Settle Up 구조 영구 보존)
-window.showAlert = (message) => {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('custom-alert-modal');
-        const msgEl = document.getElementById('alert-message');
-        const okBtn = document.getElementById('alert-ok-btn');
-        if(!modal || !msgEl || !okBtn) { alert(message); resolve(); return; }
-        msgEl.innerHTML = message.replace(/\n/g, '<br>');
-        modal.classList.remove('hidden-view');
-        const handleOk = () => {
-            modal.classList.add('hidden-view');
-            okBtn.removeEventListener('click', handleOk);
-            resolve();
-        };
-        okBtn.addEventListener('click', handleOk);
-    });
-};
+import '../style.css';
+import { createSupabaseClient } from './services/supabaseClient.js';
+import { installModalHandlers } from './shared/modal.js';
+import { appendCell, setText } from './shared/dom.js';
+import { formatCommas, formatPercent, formatWon, parseCommas } from './shared/format.js';
+import { formatDateKey, getDayName, getKstToday, getPreviousMonth, parseDateKey } from './shared/date.js';
+import { buildDailySummaryFromView, compareTotals, createInsightMessages, summarizeDailyMap } from './features/analytics.js';
 
-window.showConfirm = (message) => {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('custom-confirm-modal');
-        const msgEl = document.getElementById('confirm-message');
-        const yesBtn = document.getElementById('confirm-yes-btn');
-        const noBtn = document.getElementById('confirm-no-btn');
-        if(!modal || !msgEl || !yesBtn || !noBtn) { resolve(confirm(message)); return; }
-        msgEl.innerHTML = message.replace(/\n/g, '<br>');
-        modal.classList.remove('hidden-view');
-        const cleanUp = () => {
-            modal.classList.add('hidden-view');
-            yesBtn.removeEventListener('click', handleYes);
-            noBtn.removeEventListener('click', handleNo);
-        };
-        const handleYes = () => { cleanUp(); resolve(true); };
-        const handleNo = () => { cleanUp(); resolve(false); };
-        yesBtn.addEventListener('click', handleYes);
-        noBtn.addEventListener('click', handleNo);
-    });
-};
+installModalHandlers();
 
 document.addEventListener('DOMContentLoaded', () => {
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/dailydash/sw.js').then(reg => console.log('PWA OK:', reg.scope), err => console.log('PWA Fail:', err));
+            const isLocalPreview = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
+            if (isLocalPreview) {
+                navigator.serviceWorker.getRegistrations?.().then((registrations) => {
+                    registrations.forEach((registration) => registration.unregister());
+                });
+                window.caches?.keys?.().then((keys) => {
+                    keys.filter((key) => key.startsWith('dailydash')).forEach((key) => caches.delete(key));
+                });
+                return;
+            }
+            navigator.serviceWorker.register('sw.js').then(reg => console.log('PWA OK:', reg.scope), err => console.log('PWA Fail:', err));
         });
     }
     
-    const SUPABASE_URL = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxid2xvZG5ndXd1dWRiYmFxbXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg2NjQsImV4cCI6MjA5NDYwNDY2NH0.YJ3zbTthU2aGDCAfnk1GWeuI2nj4VM8qLAKXyaNITPQ';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = createSupabaseClient();
 
     // DOM 요소 캐싱
     const datePicker = document.getElementById('currentDate');
     const form = document.getElementById('transactionForm');
+    const submitTransactionBtn = document.getElementById('submitTransactionBtn');
     const tableBody = document.getElementById('tableBody');
     const noteInput = document.getElementById('dailyNote');
     const saveNoteBtn = document.getElementById('saveNoteBtn');
@@ -86,20 +66,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const approvalListBody = document.getElementById('approvalListBody');
 
     const downloadExcelBtn = document.getElementById('downloadExcelBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
 
     // 전역 차트 인스턴스 핸들 객체 (중복 생성 방지용)
     let trendChartInstance = null;
 
     if (!datePicker || !tabDaily || !tableBody) return;
-
-    // 세자리 세퍼레이터 및 초기 0 제거 텍스트 플레이스홀절 제어 엔진
-    function formatCommas(val) {
-        let num = String(val).replace(/[^0-9]/g, '');
-        return num ? Number(num).toLocaleString() : '';
-    }
-    function parseCommas(val) {
-        return parseInt(String(val).replace(/[^0-9]/g, '')) || 0;
-    }
 
     ['count', 'cashIn', 'cardIn', 'cashOut'].forEach(id => {
         const el = document.getElementById(id);
@@ -113,9 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 커스텀 요일 표기 디스플레이 유틸리티
     function updateDateDisplay(dateStr) {
         if (!dateStr) return;
-        const days = ['일', '월', '화', '수', '목', '금', '토'];
-        const d = new Date(dateStr);
-        const dayName = days[d.getDay()];
+        const dayName = getDayName(dateStr);
         document.getElementById('dateDisplay').textContent = `${dateStr} (${dayName})`;
     }
 
@@ -130,9 +100,47 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(displayId).textContent = defaultText;
             return;
         }
-        const days = ['일', '월', '화', '수', '목', '금', '토'];
-        const d = new Date(inputEl.value);
-        document.getElementById(displayId).textContent = `${inputEl.value} (${days[d.getDay()]})`;
+        document.getElementById(displayId).textContent = `${inputEl.value} (${getDayName(inputEl.value)})`;
+    }
+
+    async function fetchDailySalesSummary(startStr, endStr) {
+        const { data, error } = await supabase
+            .from('v_daily_sales_summary')
+            .select('transaction_date, row_count, total_people, total_cash, total_card, total_expense, total_sales, net_sales, average_ticket')
+            .gte('transaction_date', startStr)
+            .lte('transaction_date', endStr)
+            .order('transaction_date', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    }
+
+    function renderInsightList(listId, messages) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        list.replaceChildren();
+        messages.forEach((message) => {
+            const item = document.createElement('li');
+            item.textContent = message;
+            list.appendChild(item);
+        });
+    }
+
+    function formatComparisonText(comparison) {
+        if (!comparison || comparison.rate === null) return '비교 없음';
+        const sign = comparison.diff >= 0 ? '+' : '-';
+        return `${sign}${Math.abs(Math.round(comparison.rate)).toLocaleString()}%`;
+    }
+
+    function getPreviousRange(startStr, endStr) {
+        const start = parseDateKey(startStr);
+        const end = parseDateKey(endStr);
+        const dayLength = Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1;
+        const prevEnd = new Date(start);
+        prevEnd.setDate(prevEnd.getDate() - 1);
+        const prevStart = new Date(prevEnd);
+        prevStart.setDate(prevStart.getDate() - dayLength + 1);
+        return { startStr: formatDateKey(prevStart), endStr: formatDateKey(prevEnd) };
     }
 
     // 3. 앱 초기화
@@ -140,17 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return; 
 
-        if (session.user.email === 'eowert72@gmail.com') {
-            const oneMonthAgo = new Date();
-            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-            await supabase.from('transactions').delete().lt('deleted_at', oneMonthAgo.toISOString());
-        }
+        // 운영 데이터 보호: 프론트엔드에서는 삭제 보관분을 물리 삭제하지 않는다.
+        // 장기 보관/정리는 Supabase 백업 확인 후 서버 작업이나 스케줄러에서 별도로 처리한다.
 
         // 한국/일본 시간(UTC+9) 기준으로 현재 날짜 구하기
-        const now = new Date();
-        const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-        const kstTime = new Date(utc + (9 * 60 * 60 * 1000));
-        const today = kstTime.getFullYear() + '-' + String(kstTime.getMonth() + 1).padStart(2, '0') + '-' + String(kstTime.getDate()).padStart(2, '0');
+        const today = getKstToday();
         
         datePicker.value = today;
         updateDateDisplay(today);
@@ -182,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loadTotalBtn) loadTotalBtn.addEventListener('click', () => loadTotalRangeData());
         if (downloadExcelBtn) downloadExcelBtn.addEventListener('click', () => downloadStyledExcel('monthlyTable', monthPicker.value));
         if (downloadTotalExcelBtn) downloadTotalExcelBtn.addEventListener('click', () => downloadStyledExcel('totalRangeTable', `${totalStartDate.value}_to_${totalEndDate.value}`));
+        if (logoutBtn) logoutBtn.addEventListener('click', () => window.logout());
 
         if (myPageBtn && myPageModal && closeMyPage) {
             myPageBtn.addEventListener('click', () => {
@@ -223,12 +226,13 @@ document.addEventListener('DOMContentLoaded', () => {
         approvalListBody.innerHTML = '';
         list.forEach(item => {
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td style="padding: 12px; font-weight: 500; text-align:left;">${item.email}</td>
-                <td style="padding: 12px; text-align: center;">
-                    <button onclick="approveUser('${item.email}')" class="btn-approve"><i class="fas fa-user-check"></i> 가입 승인</button>
-                </td>
-            `;
+            appendCell(row, item.email, 'padding: 12px; font-weight: 500; text-align:left;');
+            const actionCell = appendCell(row, '', 'padding: 12px; text-align: center;');
+            const approveBtn = document.createElement('button');
+            approveBtn.className = 'btn-approve';
+            approveBtn.innerHTML = '<i class="fas fa-user-check"></i> 가입 승인';
+            approveBtn.addEventListener('click', () => window.approveUser(item.email));
+            actionCell.appendChild(approveBtn);
             approvalListBody.appendChild(row);
         });
     }
@@ -272,17 +276,20 @@ document.addEventListener('DOMContentLoaded', () => {
             tCardIn += tx.card_income || 0;
 
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td style="font-weight: 500;">${tx.description || ''}</td>
-                <td>${(tx.customer_count || 0).toLocaleString()}</td>
-                <td>${(tx.cash_income || 0).toLocaleString()}</td>
-                <td>${(tx.cash_expense || 0).toLocaleString()}</td>
-                <td>${(tx.card_income || 0).toLocaleString()}</td>
-                <td style="color: var(--text-muted);">${tx.remark1 || ''}</td>
-                <td style="color: var(--text-muted);">${tx.remark2 || ''}</td>
-                <td><button onclick="deleteTransaction('${tx.id}')" class="btn-danger"><i class="fas fa-trash-alt"></i> 삭제</button></td>
-            `;
+            appendCell(row, index + 1);
+            appendCell(row, tx.description || '', 'font-weight: 500;');
+            appendCell(row, (tx.customer_count || 0).toLocaleString());
+            appendCell(row, (tx.cash_income || 0).toLocaleString());
+            appendCell(row, (tx.cash_expense || 0).toLocaleString());
+            appendCell(row, (tx.card_income || 0).toLocaleString());
+            appendCell(row, tx.remark1 || '', 'color: var(--text-muted);');
+            appendCell(row, tx.remark2 || '', 'color: var(--text-muted);');
+            const actionCell = appendCell(row, '');
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-danger';
+            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> 삭제';
+            deleteBtn.addEventListener('click', () => window.deleteTransaction(tx.id));
+            actionCell.appendChild(deleteBtn);
             tableBody.appendChild(row);
         });
         updateDailyTotals(tCount, tCashIn, tCashOut, tCardIn);
@@ -293,11 +300,16 @@ document.addEventListener('DOMContentLoaded', () => {
         elTotalCashIn.textContent = cashIn.toLocaleString();
         elTotalCashOut.textContent = cashOut.toLocaleString();
         elTotalCardIn.textContent = cardIn.toLocaleString();
+        setText('dailyTotalSales', (cashIn + cardIn).toLocaleString());
+        setText('dailyNetCash', (cashIn - cashOut).toLocaleString());
+        setText('dailyTotalPeople', count.toLocaleString());
+        setText('dailyTotalExpense', cashOut.toLocaleString());
     }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const date = datePicker.value;
+        const originalButtonHtml = submitTransactionBtn?.innerHTML;
         const newTx = {
             transaction_date: date,
             description: document.getElementById('desc').value,
@@ -309,12 +321,27 @@ document.addEventListener('DOMContentLoaded', () => {
             remark2: document.getElementById('remark2').value
         };
 
-        const { error } = await supabase.from('transactions').insert([newTx]);
-        if (!error) {
+        if (submitTransactionBtn) {
+            submitTransactionBtn.disabled = true;
+            submitTransactionBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+        }
+
+        try {
+            const { error } = await supabase.from('transactions').insert([newTx]);
+            if (error) throw error;
+
             form.reset();
             ['count','cashIn','cardIn','cashOut'].forEach(id => document.getElementById(id).value = '');
-            loadDailyData(date);
-        } else { await window.showAlert("저장 실패: " + error.message); }
+            await loadDailyData(date);
+            await window.showAlert("입력이 완료되었습니다.");
+        } catch (error) {
+            await window.showAlert("저장 실패: " + error.message);
+        } finally {
+            if (submitTransactionBtn) {
+                submitTransactionBtn.disabled = false;
+                submitTransactionBtn.innerHTML = originalButtonHtml || '<i class="fas fa-check"></i> 입력하기';
+            }
+        }
     });
 
     window.deleteTransaction = async (id) => {
@@ -373,16 +400,14 @@ document.addEventListener('DOMContentLoaded', () => {
             modalTableBody.innerHTML = '';
             list.forEach((tx, idx) => {
                 const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${idx + 1}</td>
-                    <td style="font-weight: 500; text-align: left !important;">${tx.description || '-'}</td>
-                    <td>${(tx.customer_count || 0).toLocaleString()}명</td>
-                    <td style="color: var(--secondary); font-weight: 600;">${(tx.cash_income || 0).toLocaleString()}원</td>
-                    <td style="color: var(--danger);">${(tx.cash_expense || 0).toLocaleString()}원</td>
-                    <td style="color: #f59e0b; font-weight: 600;">${(tx.card_income || 0).toLocaleString()}원</td>
-                    <td style="color: var(--text-muted); text-align: left !important;">${tx.remark1 || ''}</td>
-                    <td style="color: var(--text-muted); text-align: left !important;">${tx.remark2 || ''}</td>
-                `;
+                appendCell(row, idx + 1);
+                appendCell(row, tx.description || '-', 'font-weight: 500; text-align: left !important;');
+                appendCell(row, `${(tx.customer_count || 0).toLocaleString()}명`);
+                appendCell(row, formatWon(tx.cash_income), 'color: var(--secondary); font-weight: 600;');
+                appendCell(row, formatWon(tx.cash_expense), 'color: var(--danger);');
+                appendCell(row, formatWon(tx.card_income), 'color: #f59e0b; font-weight: 600;');
+                appendCell(row, tx.remark1 || '', 'color: var(--text-muted); text-align: left !important;');
+                appendCell(row, tx.remark2 || '', 'color: var(--text-muted); text-align: left !important;');
                 modalTableBody.appendChild(row);
             });
         } catch (err) {
@@ -393,67 +418,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadMonthlyData(monthStr) {
         try {
-            monthlyTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 데이터를 분석하는 중...</td></tr>';
+            monthlyTableBody.innerHTML = '<tr><td colspan="11" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 데이터를 분석하는 중...</td></tr>';
             const startDate = `${monthStr}-01`;
             const lastDay = new Date(monthStr.split('-')[0], monthStr.split('-')[1], 0).getDate();
-            const endDate = `${monthStr}-${lastDay}`;
+            const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
 
-            let allTxs = [];
-            let fromIdx = 0;
-            const limit = 1000;
-            let hasMore = true;
+            const summaryRows = await fetchDailySalesSummary(startDate, endDate);
+            const dailySummary = buildDailySummaryFromView(startDate, endDate, summaryRows);
+            const summary = summarizeDailyMap(dailySummary);
 
-            while (hasMore) {
-                const { data: txs, error } = await supabase
-                    .from('transactions')
-                    .select('transaction_date, customer_count, cash_income, card_income')
-                    .gte('transaction_date', startDate)
-                    .lte('transaction_date', endDate)
-                    .is('deleted_at', null)
-                    .order('transaction_date', { ascending: true })
-                    .range(fromIdx, fromIdx + limit - 1);
-
-                if (error) throw error;
-                if (txs && txs.length > 0) allTxs = allTxs.concat(txs);
-                if (!txs || txs.length < limit) hasMore = false;
-                else fromIdx += limit;
-            }
-
-            const dailySummary = {};
-            for (let i = 1; i <= lastDay; i++) {
-                const d = `${monthStr}-${String(i).padStart(2, '0')}`;
-                dailySummary[d] = { count: 0, cash: 0, card: 0, total: 0 };
-            }
-
-            let maxSales = 0; let maxSalesDay = '-';
-
-            allTxs.forEach(tx => {
-                const d = tx.transaction_date;
-                if (dailySummary[d]) {
-                    dailySummary[d].count += (tx.customer_count || 0);
-                    dailySummary[d].cash += (tx.cash_income || 0);
-                    dailySummary[d].card += (tx.card_income || 0);
-                    dailySummary[d].total += ((tx.cash_income || 0) + (tx.card_income || 0));
-                }
-            });
+            const prevMonth = getPreviousMonth(monthStr);
+            const prevLastDay = new Date(prevMonth.split('-')[0], prevMonth.split('-')[1], 0).getDate();
+            const prevStartDate = `${prevMonth}-01`;
+            const prevEndDate = `${prevMonth}-${String(prevLastDay).padStart(2, '0')}`;
+            const prevSummaryRows = await fetchDailySalesSummary(prevStartDate, prevEndDate);
+            const prevSummary = summarizeDailyMap(buildDailySummaryFromView(prevStartDate, prevEndDate, prevSummaryRows));
+            const comparison = compareTotals(summary, prevSummary);
 
             monthlyTableBody.innerHTML = '';
-            let accCount = 0, accCash = 0, accCard = 0, accTotal = 0;
+            let accCount = 0, accCash = 0, accExpense = 0, accCard = 0, accTotal = 0, accNet = 0;
 
             for (let i = 1; i <= lastDay; i++) {
                 const d = `${monthStr}-${String(i).padStart(2, '0')}`;
                 const dayData = dailySummary[d];
                 
-                accCount += dayData.count; accCash += dayData.cash; accCard += dayData.card; accTotal += dayData.total;
-                if (dayData.total > maxSales) { maxSales = dayData.total; maxSalesDay = d; }
+                accCount += dayData.count; accCash += dayData.cash; accExpense += dayData.expense; accCard += dayData.card; accTotal += dayData.total; accNet += dayData.net;
 
                 const row = document.createElement('tr');
                 // 클릭 가능한 행임을 스타일로 유추할 수 있도록 클래스 주입
                 row.classList.add('clickable-row');
                 if (dayData.total === 0) row.style.opacity = '0.5'; 
 
-                const days = ['일', '월', '화', '수', '목', '금', '토'];
-                const dayName = days[new Date(d).getDay()];
+                const dayName = getDayName(d);
                 const formattedDate = `${d} (${dayName})`;
 
                 row.innerHTML = `
@@ -462,9 +458,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="font-weight:700; color:var(--text-main);">${accCount.toLocaleString()}</td>
                     <td>${dayData.cash.toLocaleString()}</td>
                     <td style="color:var(--secondary); font-weight:700;">${accCash.toLocaleString()}</td>
+                    <td style="color:var(--danger);">${dayData.expense.toLocaleString()}</td>
+                    <td style="color:var(--danger); font-weight:700;">${accExpense.toLocaleString()}</td>
                     <td>${dayData.card.toLocaleString()}</td>
                     <td style="color:#f59e0b; font-weight:700;">${accCard.toLocaleString()}</td>
                     <td style="font-weight:700; color:var(--primary);">${dayData.total.toLocaleString()}</td>
+                    <td style="font-weight:700; color:var(--text-main);">${dayData.net.toLocaleString()}</td>
                 `;
                 
                 // 요구사항 1번: 일자별 행 클릭 시 상세 모달을 호출하는 클릭 핸들러 동적 주입
@@ -475,32 +474,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 monthlyTableBody.appendChild(row);
             }
 
-            document.getElementById('monthTotalSales').textContent = accTotal.toLocaleString();
-            document.getElementById('monthTotalCash').textContent = accCash.toLocaleString();
-            document.getElementById('monthTotalCard').textContent = accCard.toLocaleString();
-            document.getElementById('monthTotalCount').textContent = accCount.toLocaleString();
+            setText('monthTotalSales', summary.total.toLocaleString());
+            setText('monthTotalCash', summary.cash.toLocaleString());
+            setText('monthTotalCard', summary.card.toLocaleString());
+            setText('monthTotalExpense', summary.expense.toLocaleString());
+            setText('monthNetSales', summary.net.toLocaleString());
+            setText('monthTotalCount', summary.count.toLocaleString());
 
-            document.getElementById('monthAvgSales').textContent = Math.round(accTotal / lastDay).toLocaleString() + " 원";
-            document.getElementById('monthMaxSalesDay').textContent = maxSales > 0 ? `${maxSalesDay.substring(5)}일 (${maxSales.toLocaleString()}원)` : '-';
-            document.getElementById('monthCashRatio').textContent = accTotal > 0 ? `${Math.round((accCash / accTotal) * 100)}%` : '0%';
+            setText('monthAvgSales', summary.averageSales.toLocaleString() + " 원");
+            setText('monthAvgTicket', summary.averageTicket.toLocaleString() + " 원");
+            setText('monthCompareSales', formatComparisonText(comparison));
+            setText('monthMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay.substring(5)}일 (${summary.maxSales.toLocaleString()}원)` : '-');
+            setText('monthCashRatio', formatPercent(summary.cashRatio));
+            setText('monthOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
+            renderInsightList('monthInsightList', createInsightMessages(summary, comparison));
 
         } catch (err) {
             console.error(err);
-            monthlyTableBody.innerHTML = `<tr><td colspan="8" class="empty-msg" style="color: var(--danger);">통계 데이터를 불러오지 못했습니다.</td></tr>`;
+            monthlyTableBody.innerHTML = `<tr><td colspan="11" class="empty-msg" style="color: var(--danger);">통계 데이터를 불러오지 못했습니다.</td></tr>`;
         }
     }
 
     // 요구사항 2번: 트렌디한 통계 분석 처리를 위한 종합 시각화 및 요일 분석 엔진 탑재
-    function renderAdvancedAnalytics(dailySummary, allTxs) {
+    function renderAdvancedAnalytics(dailySummary) {
         const sortedDates = Object.keys(dailySummary).sort();
         const labels = sortedDates.map(d => d.substring(5)); // 'MM-DD' 포맷팅
         
         const cashData = [];
         const cardData = [];
+        const expenseData = [];
         const customerData = [];
         
         // 요일별 누적 집계 데이터 공간 구성 (0: 일요일 ~ 6: 토요일)
         const weekdaySales = [0, 0, 0, 0, 0, 0, 0];
+        const weekdayOpenDays = [0, 0, 0, 0, 0, 0, 0];
         const weekdayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
         let totalSalesAccum = 0;
 
@@ -508,11 +515,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = dailySummary[d];
             cashData.push(data.cash);
             cardData.push(data.card);
+            expenseData.push(data.expense || 0);
             customerData.push(data.count);
             
             // 요일 정보 추출하여 가산
-            const dayIndex = new Date(d).getDay();
+            const dayIndex = parseDateKey(d).getDay();
             weekdaySales[dayIndex] += data.total;
+            if (data.count > 0 || data.total > 0 || data.expense > 0) weekdayOpenDays[dayIndex]++;
             totalSalesAccum += data.total;
         });
 
@@ -539,6 +548,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             data: cardData,
                             backgroundColor: '#f59e0b',
                             stack: 'combinedSales'
+                        },
+                        {
+                            label: '현금 지출',
+                            data: expenseData,
+                            type: 'line',
+                            borderColor: '#ef4444',
+                            backgroundColor: '#ef4444',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            fill: false
                         },
                         {
                             label: '방문 인원 (명)',
@@ -584,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             weekdaySales.forEach((sales, idx) => {
                 const ratio = totalSalesAccum > 0 ? Math.round((sales / totalSalesAccum) * 100) : 0;
+                const avgSales = weekdayOpenDays[idx] > 0 ? Math.round(sales / weekdayOpenDays[idx]) : 0;
                 
                 const barRow = document.createElement('div');
                 barRow.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 0.9rem;";
@@ -598,7 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="flex: 1; background: var(--side-bg); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
                         <div style="width: ${ratio}%; background: var(--primary); height: 100%; border-radius: 4px; transition: width 0.3s ease;"></div>
                     </div>
-                    <div style="width: 85px; text-align: right; font-weight: 700; color: var(--text-main);">${ratio}% <span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">(${Math.round(sales/10000).toLocaleString()}만)</span></div>
+                    <div style="width: 130px; text-align: right; font-weight: 700; color: var(--text-main);">${ratio}% <span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">평균 ${Math.round(avgSales/10000).toLocaleString()}만</span></div>
                 `;
                 weekdayWrap.appendChild(barRow);
             });
@@ -610,68 +631,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const endStr = totalEndDate.value;
         if (!startStr || !endStr) { await window.showAlert("시작일과 종료일을 올바르게 선택해 주세요."); return; }
         
-        if (new Date(startStr) > new Date(endStr)) { await window.showAlert("시작일이 종료일보다 늦을 수 없습니다."); return; }
+        if (parseDateKey(startStr) > parseDateKey(endStr)) { await window.showAlert("시작일이 종료일보다 늦을 수 없습니다."); return; }
 
         try {
-            totalTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 기간 데이터를 종합 분석 중...</td></tr>';
-            
-            let allTxs = [];
-            let fromIdx = 0;
-            const limit = 1000;
-            let hasMore = true;
+            totalTableBody.innerHTML = '<tr><td colspan="11" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 기간 데이터를 종합 분석 중...</td></tr>';
 
-            while (hasMore) {
-                const { data: txs, error } = await supabase
-                    .from('transactions')
-                    .select('transaction_date, customer_count, cash_income, card_income')
-                    .gte('transaction_date', startStr)
-                    .lte('transaction_date', endStr)
-                    .is('deleted_at', null)
-                    .order('transaction_date', { ascending: true })
-                    .range(fromIdx, fromIdx + limit - 1);
+            const summaryRows = await fetchDailySalesSummary(startStr, endStr);
+            const dailySummary = buildDailySummaryFromView(startStr, endStr, summaryRows);
+            const summary = summarizeDailyMap(dailySummary);
 
-                if (error) throw error;
-                if (txs && txs.length > 0) allTxs = allTxs.concat(txs);
-                if (!txs || txs.length < limit) hasMore = false;
-                else fromIdx += limit;
-            }
-
-            const start = new Date(startStr);
-            const end = new Date(endStr);
-            const dailySummary = {};
-            let totalDaysCount = 0;
-
-            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
-                dailySummary[dateStr] = { count: 0, cash: 0, card: 0, total: 0 };
-                totalDaysCount++;
-            }
-
-            let maxSales = 0; let maxSalesDay = '-';
-
-            allTxs.forEach(tx => {
-                const d = tx.transaction_date;
-                if (dailySummary[d]) {
-                    dailySummary[d].count += (tx.customer_count || 0);
-                    dailySummary[d].cash += (tx.cash_income || 0);
-                    dailySummary[d].card += (tx.card_income || 0);
-                    dailySummary[d].total += ((tx.cash_income || 0) + (tx.card_income || 0));
-                }
-            });
+            const previousRange = getPreviousRange(startStr, endStr);
+            const prevSummaryRows = await fetchDailySalesSummary(previousRange.startStr, previousRange.endStr);
+            const prevSummary = summarizeDailyMap(buildDailySummaryFromView(previousRange.startStr, previousRange.endStr, prevSummaryRows));
+            const comparison = compareTotals(summary, prevSummary);
 
             totalTableBody.innerHTML = '';
-            let accCount = 0, accCash = 0, accCard = 0, accTotal = 0;
+            let accCount = 0, accCash = 0, accExpense = 0, accCard = 0, accTotal = 0, accNet = 0;
 
             Object.keys(dailySummary).sort().forEach(d => {
                 const dayData = dailySummary[d];
-                accCount += dayData.count; accCash += dayData.cash; accCard += dayData.card; accTotal += dayData.total;
-                if (dayData.total > maxSales) { maxSales = dayData.total; maxSalesDay = d; }
+                accCount += dayData.count; accCash += dayData.cash; accExpense += dayData.expense; accCard += dayData.card; accTotal += dayData.total; accNet += dayData.net;
 
                 const row = document.createElement('tr');
                 if (dayData.total === 0) row.style.opacity = '0.5';
 
-                const days = ['일', '월', '화', '수', '목', '금', '토'];
-                const dayName = days[new Date(d).getDay()];
+                const dayName = getDayName(d);
                 const formattedDate = `${d} (${dayName})`;
 
                 row.innerHTML = `
@@ -680,28 +664,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="font-weight:700; color:var(--text-main);">${accCount.toLocaleString()}</td>
                     <td>${dayData.cash.toLocaleString()}</td>
                     <td style="color:var(--secondary); font-weight:700;">${accCash.toLocaleString()}</td>
+                    <td style="color:var(--danger);">${dayData.expense.toLocaleString()}</td>
+                    <td style="color:var(--danger); font-weight:700;">${accExpense.toLocaleString()}</td>
                     <td>${dayData.card.toLocaleString()}</td>
                     <td style="color:#f59e0b; font-weight:700;">${accCard.toLocaleString()}</td>
                     <td style="font-weight:700; color:var(--primary);">${dayData.total.toLocaleString()}</td>
+                    <td style="font-weight:700; color:var(--text-main);">${dayData.net.toLocaleString()}</td>
                 `;
                 totalTableBody.appendChild(row);
             });
 
-            document.getElementById('rangeTotalSales').textContent = accTotal.toLocaleString();
-            document.getElementById('rangeTotalCash').textContent = accCash.toLocaleString();
-            document.getElementById('rangeTotalCard').textContent = accCard.toLocaleString();
-            document.getElementById('rangeTotalCount').textContent = accCount.toLocaleString();
+            setText('rangeTotalSales', summary.total.toLocaleString());
+            setText('rangeTotalCash', summary.cash.toLocaleString());
+            setText('rangeTotalCard', summary.card.toLocaleString());
+            setText('rangeTotalExpense', summary.expense.toLocaleString());
+            setText('rangeNetSales', summary.net.toLocaleString());
+            setText('rangeTotalCount', summary.count.toLocaleString());
 
-            document.getElementById('rangeAvgSales').textContent = Math.round(accTotal / (totalDaysCount || 1)).toLocaleString() + " 원";
-            document.getElementById('rangeMaxSalesDay').textContent = maxSales > 0 ? `${maxSalesDay} (${maxSales.toLocaleString()}원)` : '-';
-            document.getElementById('rangeCashRatio').textContent = accTotal > 0 ? `${Math.round((accCash / accTotal) * 100)}%` : '0%';
+            setText('rangeAvgSales', summary.averageSales.toLocaleString() + " 원");
+            setText('rangeAvgTicket', summary.averageTicket.toLocaleString() + " 원");
+            setText('rangeCompareSales', formatComparisonText(comparison));
+            setText('rangeMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay} (${summary.maxSales.toLocaleString()}원)` : '-');
+            setText('rangeCashRatio', formatPercent(summary.cashRatio));
+            setText('rangeOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
+            renderInsightList('rangeInsightList', createInsightMessages(summary, comparison));
 
             // 신규 시각화 함수 연동 파이프라인 배치
-            renderAdvancedAnalytics(dailySummary, allTxs);
+            renderAdvancedAnalytics(dailySummary);
 
         } catch (err) {
             console.error(err);
-            totalTableBody.innerHTML = `<tr><td colspan="8" class="empty-msg" style="color: var(--danger);">데이터 로드 중 에러가 발생했습니다.</td></tr>`;
+            totalTableBody.innerHTML = `<tr><td colspan="11" class="empty-msg" style="color: var(--danger);">데이터 로드 중 에러가 발생했습니다.</td></tr>`;
         }
     }
 
@@ -716,6 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!table) return;
 
         const wsData = [];
+        const columnCount = table.querySelector('thead tr')?.cells.length || 8;
         
         wsData.push(['DailyDash 매출보고서']);
         wsData.push([`조회 대상/기간: ${labelStr}`]);
@@ -734,8 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const ws = XLSX.utils.aoa_to_sheet(wsData);
 
         ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
+            { s: { r: 0, c: 0 }, e: { r: 0, c: columnCount - 1 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: columnCount - 1 } }
         ];
 
         for (let cellRef in ws) {
@@ -801,16 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { hpt: 26 }  
         ];
 
-        ws['!cols'] = [
-            { wch: 18 }, 
-            { wch: 12 }, 
-            { wch: 12 }, 
-            { wch: 15 }, 
-            { wch: 15 }, 
-            { wch: 15 }, 
-            { wch: 15 }, 
-            { wch: 18 }  
-        ];
+        ws['!cols'] = Array.from({ length: columnCount }, (_, index) => ({ wch: index === 0 ? 18 : 14 }));
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "매출보고서");
@@ -822,9 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.logout = async () => {
     if (await window.showConfirm("로그아웃 하시겠습니까?")) {
-        const SUPABASE_URL = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxid2xvZG5ndXd1dWRiYmFxbXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg2NjQsImV4cCI6MjA5NDYwNDY2NH0.YJ3zbTthU2aGDCAfnk1GWeuI2nj4VM8qLAKXyaNITPQ';
-        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const sb = createSupabaseClient();
         await sb.auth.signOut();
         window.location.replace('login.html');
     }

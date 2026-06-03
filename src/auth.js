@@ -1,54 +1,10 @@
-// ✅ [신규 추가] 커스텀 알림/확인 모달을 호출하는 전역 함수
-window.showAlert = (message) => {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('custom-alert-modal');
-        const msgEl = document.getElementById('alert-message');
-        const okBtn = document.getElementById('alert-ok-btn');
-        
-        if(!modal || !msgEl || !okBtn) { alert(message); resolve(); return; }
-        
-        msgEl.innerHTML = message.replace(/\n/g, '<br>');
-        modal.classList.remove('hidden-view');
-        
-        const handleOk = () => {
-            modal.classList.add('hidden-view');
-            okBtn.removeEventListener('click', handleOk);
-            resolve();
-        };
-        okBtn.addEventListener('click', handleOk);
-    });
-};
+import '../style.css';
+import { createSupabaseClient } from './services/supabaseClient.js';
+import { installModalHandlers } from './shared/modal.js';
 
-window.showConfirm = (message) => {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('custom-confirm-modal');
-        const msgEl = document.getElementById('confirm-message');
-        const yesBtn = document.getElementById('confirm-yes-btn');
-        const noBtn = document.getElementById('confirm-no-btn');
-        
-        if(!modal || !msgEl || !yesBtn || !noBtn) { resolve(confirm(message)); return; }
-        
-        msgEl.innerHTML = message.replace(/\n/g, '<br>');
-        modal.classList.remove('hidden-view');
-        
-        const cleanUp = () => {
-            modal.classList.add('hidden-view');
-            yesBtn.removeEventListener('click', handleYes);
-            noBtn.removeEventListener('click', handleNo);
-        };
-        
-        const handleYes = () => { cleanUp(); resolve(true); };
-        const handleNo = () => { cleanUp(); resolve(false); };
-        
-        yesBtn.addEventListener('click', handleYes);
-        noBtn.addEventListener('click', handleNo);
-    });
-};
+installModalHandlers();
 
-// -------------------------------------------------------------
-const SUPABASE_URL = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxid2xvZG5ndXd1dWRiYmFxbXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg2NjQsImV4cCI6MjA5NDYwNDY2NH0.YJ3zbTthU2aGDCAfnk1GWeuI2nj4VM8qLAKXyaNITPQ';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = createSupabaseClient();
 
 document.addEventListener('DOMContentLoaded', async () => {
     const currentPage = window.location.pathname.split('/').pop();

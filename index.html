@@ -21,26 +21,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        (async () => {
-            const url = 'https://lbwlodnguwuudbbaqmuz.supabase.co';
-            const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxid2xvZG5ndXd1dWRiYmFxbXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg2NjQsImV4cCI6MjA5NDYwNDY2NH0.YJ3zbTthU2aGDCAfnk1GWeuI2nj4VM8qLAKXyaNITPQ';
-            const sb = window.supabase.createClient(url, key);
-            const { data: { session } } = await sb.auth.getSession();
-            if (!session) {
-                window.location.replace('login.html');
-                return;
-            }
-            if (session.user.email !== 'eowert72@gmail.com') {
-                const { data: appv } = await sb.from('user_approvals').select('is_approved').eq('email', session.user.email).single();
-                if (!appv || !appv.is_approved) {
-                    alert("⚠️ 아직 가입 승인이 완료되지 않은 계정입니다. 최고 관리자의 승인을 기다려주세요.");
-                    await sb.auth.signOut();
-                    window.location.replace('login.html');
-                }
-            }
-        })();
-    </script>
+    <script type="module" src="/src/guard.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -52,16 +33,16 @@
             
             <div style="display: flex; align-items: center; gap: 15px;">
                 <nav class="tab-menu">
-                    <button id="tabDaily" class="tab-btn active"><i class="fas fa-calendar-day"></i> <span class="btn-text">일일 내역</span></button>
-                    <button id="tabMonthly" class="tab-btn"><i class="fas fa-calendar-alt"></i> <span class="btn-text">월간 상세 요약</span></button>
-                    <button id="tabTotal" class="tab-btn"><i class="fas fa-chart-pie"></i> <span class="btn-text">총 통계 분석</span></button>
+                    <button id="tabDaily" class="tab-btn active" data-short="일일" aria-label="일일 내역"><i class="fas fa-calendar-day"></i> <span class="btn-text">일일 내역</span></button>
+                    <button id="tabMonthly" class="tab-btn" data-short="월간" aria-label="월간 상세 요약"><i class="fas fa-calendar-alt"></i> <span class="btn-text">월간 상세 요약</span></button>
+                    <button id="tabTotal" class="tab-btn" data-short="통계" aria-label="총 통계 분석"><i class="fas fa-chart-pie"></i> <span class="btn-text">총 통계 분석</span></button>
                 </nav>
                 
-                <button id="myPageBtn" class="btn-secondary" style="margin-top: 0; width: auto; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
+                <button id="myPageBtn" class="btn-secondary" data-short="MY" aria-label="마이페이지" style="margin-top: 0; width: auto; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
                     <i class="fas fa-user-circle"></i> <span class="btn-text">마이페이지</span>
                 </button>
 
-                <button onclick="window.logout()" class="btn-danger" style="padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
+                <button id="logoutBtn" class="btn-danger" data-short="나가기" aria-label="로그아웃" style="padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
                     <i class="fas fa-sign-out-alt"></i> <span class="btn-text">로그아웃</span>
                 </button>
             </div>
@@ -110,12 +91,18 @@
                     <div class="form-group"><label for="remark1">비고 1</label><input type="text" id="remark1" placeholder="추가 내용"></div>
                     <div class="form-group"><label for="remark2">비고 2</label><input type="text" id="remark2" placeholder="고객 이름 등"></div>
                     
-                    <button type="submit" class="btn-submit"><i class="fas fa-check"></i> 입력하기</button>
+                    <button type="submit" id="submitTransactionBtn" class="btn-submit"><i class="fas fa-check"></i> 입력하기</button>
                 </form>
             </section>
 
             <section class="dashboard-section">
                 <div class="section-header"><h2><i class="fas fa-list-ul"></i> 오늘의 내역</h2></div>
+                <div class="summary-cards daily-kpi-cards">
+                    <div class="card card-primary"><h3>오늘 총매출</h3><p id="dailyTotalSales" class="amount">0</p></div>
+                    <div class="card card-dark"><h3>순현금 흐름</h3><p id="dailyNetCash" class="amount">0</p></div>
+                    <div class="card card-purple"><h3>방문 인원</h3><p id="dailyTotalPeople" class="amount">0</p></div>
+                    <div class="card card-danger"><h3>현금 지출</h3><p id="dailyTotalExpense" class="amount">0</p></div>
+                </div>
                 <div class="table-container">
                     <table id="transactionTable">
                         <thead>
@@ -152,13 +139,22 @@
                     <div class="card card-primary"><h3>총 매출 (현금+카드)</h3><p id="monthTotalSales" class="amount">0</p></div>
                     <div class="card card-success"><h3>현금 누적</h3><p id="monthTotalCash" class="amount">0</p></div>
                     <div class="card card-warning"><h3>카드 누적</h3><p id="monthTotalCard" class="amount">0</p></div>
+                    <div class="card card-danger"><h3>현금 지출</h3><p id="monthTotalExpense" class="amount">0</p></div>
+                    <div class="card card-dark"><h3>순매출</h3><p id="monthNetSales" class="amount">0</p></div>
                     <div class="card card-purple"><h3>총 방문 인원</h3><p id="monthTotalCount" class="amount count">0</p></div>
                 </div>
 
                 <div class="summary-cards" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 20px;">
-                    <div class="card" style="border-left: 4px solid #6366f1;"><h3>하루 평균 매출액</h3><p id="monthAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
+                    <div class="card" style="border-left: 4px solid #6366f1;"><h3>영업일 평균 매출액</h3><p id="monthAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
+                    <div class="card" style="border-left: 4px solid #111827;"><h3>객단가</h3><p id="monthAvgTicket" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
+                    <div class="card" style="border-left: 4px solid #3182f6;"><h3>전월 대비</h3><p id="monthCompareSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">-</p></div>
                     <div class="card" style="border-left: 4px solid #10b981;"><h3>최고 매출 달성일</h3><p id="monthMaxSalesDay" class="amount" style="font-size:1.3rem; color:var(--text-main);">-</p></div>
                     <div class="card" style="border-left: 4px solid #f59e0b;"><h3>현금 결제 비중</h3><p id="monthCashRatio" class="amount" style="font-size:1.4rem; color:var(--text-main);">0%</p></div>
+                    <div class="card" style="border-left: 4px solid #0f172a;"><h3>입력/영업일 수</h3><p id="monthOperatingDays" class="amount" style="font-size:1.4rem; color:var(--text-main);">0일</p></div>
+                </div>
+                <div class="insight-panel">
+                    <div class="insight-title"><i class="fas fa-lightbulb"></i> 월간 인사이트</div>
+                    <ul id="monthInsightList"><li>월을 선택하면 매출 흐름을 요약합니다.</li></ul>
                 </div>
             </section>
 
@@ -172,8 +168,8 @@
                 </div>
                 <div class="table-container">
                     <table id="monthlyTable">
-                        <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th></tr></thead>
-                        <tbody id="monthlyTableBody"><tr><td colspan="8" class="empty-msg">데이터가 없습니다.</td></tr></tbody>
+                        <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
+                        <tbody id="monthlyTableBody"><tr><td colspan="11" class="empty-msg">데이터가 없습니다.</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -203,13 +199,22 @@
                     <div class="card card-primary"><h3>지정 기간 총 매출</h3><p id="rangeTotalSales" class="amount">0</p></div>
                     <div class="card card-success"><h3>현금 매출 합계</h3><p id="rangeTotalCash" class="amount">0</p></div>
                     <div class="card card-warning"><h3>카드 매출 합계</h3><p id="rangeTotalCard" class="amount">0</p></div>
+                    <div class="card card-danger"><h3>현금 지출 합계</h3><p id="rangeTotalExpense" class="amount">0</p></div>
+                    <div class="card card-dark"><h3>기간 순매출</h3><p id="rangeNetSales" class="amount">0</p></div>
                     <div class="card card-purple"><h3>총 누적 인원</h3><p id="rangeTotalCount" class="amount count">0</p></div>
                 </div>
                 
                 <div class="summary-cards" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 20px;">
-                    <div class="card" style="border-left: 4px solid #6366f1;"><h3>기간 내 일평균 매출</h3><p id="rangeAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
+                    <div class="card" style="border-left: 4px solid #6366f1;"><h3>영업일 평균 매출</h3><p id="rangeAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
+                    <div class="card" style="border-left: 4px solid #111827;"><h3>객단가</h3><p id="rangeAvgTicket" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
+                    <div class="card" style="border-left: 4px solid #3182f6;"><h3>이전 동기간 대비</h3><p id="rangeCompareSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">-</p></div>
                     <div class="card" style="border-left: 4px solid #10b981;"><h3>기간 내 최고 매출일</h3><p id="rangeMaxSalesDay" class="amount" style="font-size:1.3rem; color:var(--text-main);">-</p></div>
                     <div class="card" style="border-left: 4px solid #f59e0b;"><h3>현금 결제 비중</h3><p id="rangeCashRatio" class="amount" style="font-size:1.4rem; color:var(--text-main);">0%</p></div>
+                    <div class="card" style="border-left: 4px solid #0f172a;"><h3>입력/영업일 수</h3><p id="rangeOperatingDays" class="amount" style="font-size:1.4rem; color:var(--text-main);">0일</p></div>
+                </div>
+                <div class="insight-panel">
+                    <div class="insight-title"><i class="fas fa-lightbulb"></i> 기간 인사이트</div>
+                    <ul id="rangeInsightList"><li>기간을 조회하면 매출 흐름을 요약합니다.</li></ul>
                 </div>
             </section>
 
@@ -235,8 +240,8 @@
                 </div>
                 <div class="table-container">
                     <table id="totalRangeTable">
-                        <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th></tr></thead>
-                        <tbody id="totalTableBody"><tr><td colspan="8" class="empty-msg">시작일과 종료일을 지정한 후 조회하기를 눌러주세요.</td></tr></tbody>
+                        <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
+                        <tbody id="totalTableBody"><tr><td colspan="11" class="empty-msg">시작일과 종료일을 지정한 후 조회하기를 눌러주세요.</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -301,6 +306,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="/src/app.js"></script>
 </body>
 </html>
