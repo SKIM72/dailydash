@@ -2,6 +2,7 @@ import '../style.css';
 import { createSupabaseClient } from './services/supabaseClient.js';
 import { installModalHandlers } from './shared/modal.js';
 import { initTheme } from './shared/theme.js';
+import { renderVersionLabels } from './shared/version.js';
 
 installModalHandlers();
 initTheme();
@@ -9,6 +10,7 @@ initTheme();
 const supabaseClient = createSupabaseClient();
 
 document.addEventListener('DOMContentLoaded', async () => {
+    renderVersionLabels();
     const currentPage = window.location.pathname.split('/').pop();
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {

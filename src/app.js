@@ -14,11 +14,13 @@ import {
     summarizeWeekdayPerformance
 } from './features/analytics.js';
 import { installThemeControls } from './shared/theme.js';
+import { renderVersionLabels } from './shared/version.js';
 
 installModalHandlers();
 installThemeControls();
 
 document.addEventListener('DOMContentLoaded', () => {
+    renderVersionLabels();
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -628,10 +630,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (noteError && noteError.code !== 'PGRST116') throw noteError;
 
             renderDailyTable(transactions || []);
+            renderDailyQualityChecks(date, transactions || []);
             noteInput.value = note ? note.special_note : '';
         } catch (err) {
             console.error(err);
             tableBody.innerHTML = `<tr><td colspan="9" class="empty-msg" style="color: var(--danger);"><i class="fas fa-exclamation-circle"></i> 로드 실패 (${err.message})</td></tr>`;
+            renderDailyQualityError(err.message);
         }
     }
 
@@ -678,6 +682,123 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('dailyNetCash', (cashIn - cashOut).toLocaleString());
         setText('dailyTotalPeople', count.toLocaleString());
         setText('dailyTotalExpense', cashOut.toLocaleString());
+    }
+
+    function getTransactionAmount(tx, key) {
+        const value = Number(tx?.[key]);
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function setDailyQualityState(tone, statusText, messages) {
+        const panel = document.getElementById('dailyQualityPanel');
+        const status = document.getElementById('dailyQualityStatus');
+        const list = document.getElementById('dailyQualityList');
+        if (!panel || !status || !list) return;
+
+        panel.classList.remove('quality-neutral', 'quality-success', 'quality-warning', 'quality-danger');
+        panel.classList.add(`quality-${tone}`);
+        status.className = `quality-badge quality-${tone}`;
+        status.textContent = statusText;
+        list.replaceChildren();
+
+        if (messages.length === 1 && messages[0].tone === 'neutral') {
+            const paragraph = document.createElement('p');
+            paragraph.textContent = messages[0].text;
+            list.appendChild(paragraph);
+            return;
+        }
+
+        const items = document.createElement('ul');
+        messages.forEach((message) => {
+            const item = document.createElement('li');
+            item.className = `quality-${message.tone || tone}`;
+            item.textContent = message.text;
+            items.appendChild(item);
+        });
+        list.appendChild(items);
+    }
+
+    function renderDailyQualityError(message) {
+        setDailyQualityState('danger', '확인 실패', [{
+            tone: 'danger',
+            text: `입력 점검을 실행하지 못했습니다. ${message || '잠시 후 다시 조회해 주세요.'}`
+        }]);
+    }
+
+    function renderDailyQualityChecks(date, transactions) {
+        if (!transactions.length) {
+            const isToday = date === getKstToday();
+            setDailyQualityState('neutral', isToday ? '입력 전' : '데이터 없음', [{
+                tone: 'neutral',
+                text: isToday ? '오늘 아직 입력된 내역이 없습니다.' : '선택한 날짜에 입력된 내역이 없습니다.'
+            }]);
+            return;
+        }
+
+        const issues = [];
+        let totalPeople = 0;
+        let totalSales = 0;
+        let totalExpense = 0;
+
+        transactions.forEach((tx, index) => {
+            const rowNo = index + 1;
+            const people = getTransactionAmount(tx, 'customer_count');
+            const cash = getTransactionAmount(tx, 'cash_income');
+            const card = getTransactionAmount(tx, 'card_income');
+            const expense = getTransactionAmount(tx, 'cash_expense');
+            const sales = cash + card;
+            const description = String(tx.description || '').trim();
+            const remarkText = `${tx.remark1 || ''} ${tx.remark2 || ''}`.trim();
+
+            totalPeople += people;
+            totalSales += sales;
+            totalExpense += expense;
+
+            if (!description) {
+                issues.push({ tone: 'warning', text: `${rowNo}번 내역의 적요가 비어 있습니다.` });
+            }
+            if (sales > 0 && people === 0) {
+                issues.push({ tone: 'danger', text: `${rowNo}번 내역은 매출이 있는데 인원이 0명입니다.` });
+            }
+            if (people > 0 && sales === 0 && expense === 0) {
+                issues.push({ tone: 'warning', text: `${rowNo}번 내역은 인원이 있는데 매출 금액이 없습니다.` });
+            }
+            if (people === 0 && sales === 0 && expense === 0) {
+                issues.push({ tone: 'warning', text: `${rowNo}번 내역은 인원과 금액이 모두 0입니다.` });
+            }
+            if (expense > 0 && sales > 0 && expense / sales >= 0.3) {
+                issues.push({ tone: 'warning', text: `${rowNo}번 내역은 지출이 매출의 30% 이상입니다.` });
+            }
+            if (expense > 0 && sales === 0 && !description && !remarkText) {
+                issues.push({ tone: 'warning', text: `${rowNo}번 내역은 지출만 입력되어 있어 사유 확인이 필요합니다.` });
+            }
+        });
+
+        if (totalSales > 0 && totalPeople === 0) {
+            issues.unshift({ tone: 'danger', text: '오늘 총매출이 있는데 총 방문 인원이 0명입니다.' });
+        }
+        if (totalSales > 0 && totalExpense / totalSales >= 0.35) {
+            issues.push({ tone: 'warning', text: `오늘 현금 지출 비중이 ${Math.round((totalExpense / totalSales) * 100).toLocaleString()}%입니다.` });
+        }
+
+        if (!issues.length) {
+            setDailyQualityState('success', '정상', [{
+                tone: 'success',
+                text: `총 ${transactions.length.toLocaleString()}건의 인원, 매출, 지출 조합에 눈에 띄는 이상이 없습니다.`
+            }]);
+            return;
+        }
+
+        const hasDanger = issues.some((issue) => issue.tone === 'danger');
+        const visibleIssues = issues.slice(0, 4);
+        if (issues.length > visibleIssues.length) {
+            visibleIssues.push({
+                tone: 'warning',
+                text: `그 외 ${issues.length - visibleIssues.length}건의 점검 항목이 더 있습니다.`
+            });
+        }
+
+        setDailyQualityState(hasDanger ? 'danger' : 'warning', `${issues.length.toLocaleString()}건 확인`, visibleIssues);
     }
 
     form.addEventListener('submit', async (e) => {
