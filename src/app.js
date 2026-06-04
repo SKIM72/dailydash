@@ -349,6 +349,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function formatWeekdayComparison(row) {
+        if (!row || !row.previousDate || row.previousDate === '-') {
+            return { text: '비교 데이터 부족', tone: '' };
+        }
+
+        if (row.lastVsPreviousRate === null) {
+            return {
+                text: `${row.previousDate.slice(5)} 대비 ${formatSignedAmount(row.lastVsPreviousDiff)}`,
+                tone: getTrendTone(row.lastVsPreviousDiff)
+            };
+        }
+
+        return {
+            text: `${row.previousDate.slice(5)} 대비 ${formatSignedRate(row.lastVsPreviousDiff, row.previousTotal)} · ${formatSignedAmount(row.lastVsPreviousDiff)}`,
+            tone: getTrendTone(row.lastVsPreviousDiff)
+        };
+    }
+
     function renderWeekdaySignals(containerId, weekdaySummary) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -400,6 +418,48 @@ document.addEventListener('DOMContentLoaded', () => {
             item.append(label, value, meta);
             container.appendChild(item);
         });
+
+        const detailList = document.createElement('div');
+        detailList.className = 'weekday-detail-list';
+
+        weekdaySummary.activeRows
+            .slice()
+            .sort((a, b) => b.average - a.average || b.total - a.total)
+            .forEach((row) => {
+                const compare = formatWeekdayComparison(row);
+                const card = document.createElement('article');
+                card.className = 'weekday-detail-card';
+
+                const head = document.createElement('div');
+                head.className = 'weekday-detail-head';
+
+                const title = document.createElement('strong');
+                title.textContent = row.name;
+
+                const average = document.createElement('span');
+                average.textContent = `평균 ${formatWon(row.average)}`;
+
+                head.append(title, average);
+
+                const meta = document.createElement('div');
+                meta.className = 'weekday-detail-meta';
+                meta.textContent = `${row.operatingDays.toLocaleString()}영업일 · 최근 4회 평균 ${formatWon(row.recentFourAverage)}`;
+
+                const comparePill = document.createElement('div');
+                comparePill.className = `weekday-compare-pill ${compare.tone}`;
+                comparePill.textContent = `직전 같은 요일 ${compare.text}`;
+
+                const description = document.createElement('div');
+                description.className = 'weekday-description-line';
+                description.textContent = row.topDescription
+                    ? `TOP 적요 ${row.topDescription.description} · ${formatWon(row.topDescription.total)}`
+                    : 'TOP 적요 데이터 부족';
+
+                card.append(head, meta, comparePill, description);
+                detailList.appendChild(card);
+            });
+
+        container.appendChild(detailList);
     }
 
     function renderDescriptionRanking(containerId, descriptionSummary) {
@@ -932,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(prevStartDate, prevEndDate, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
             const transactions = await fetchTransactionsForRange(startDate, endDate);
-            const weekdaySummary = summarizeWeekdayPerformance(dailySummary);
+            const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
             const descriptionSummary = summarizeDescriptions(transactions);
 
             monthlyTableBody.innerHTML = '';
@@ -1289,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(previousRange.startStr, previousRange.endStr, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
             const transactions = await fetchTransactionsForRange(startStr, endStr);
-            const weekdaySummary = summarizeWeekdayPerformance(dailySummary);
+            const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
             const descriptionSummary = summarizeDescriptions(transactions);
 
             totalTableBody.innerHTML = '';

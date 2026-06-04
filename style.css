@@ -586,6 +586,83 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     font-weight: 700;
 }
 
+.weekday-detail-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 2px;
+}
+
+.weekday-detail-card {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px;
+    background: var(--main-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.weekday-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.weekday-detail-head strong {
+    min-width: 0;
+    color: var(--text-main);
+    font-size: 0.98rem;
+    font-weight: 900;
+    letter-spacing: 0;
+}
+
+.weekday-detail-head span {
+    flex-shrink: 0;
+    color: var(--primary);
+    font-size: 0.9rem;
+    font-weight: 900;
+}
+
+.weekday-detail-meta,
+.weekday-description-line {
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.weekday-compare-pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 26px;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: var(--side-bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+.weekday-compare-pill.is-positive {
+    background: color-mix(in srgb, var(--secondary) 12%, var(--main-bg));
+    border-color: color-mix(in srgb, var(--secondary) 32%, var(--border));
+    color: var(--secondary);
+}
+
+.weekday-compare-pill.is-negative {
+    background: color-mix(in srgb, var(--danger) 10%, var(--main-bg));
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+    color: var(--danger);
+}
+
 .ranking-list {
     display: grid;
     gap: 10px;
@@ -1129,6 +1206,14 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     }
     .analysis-panels {
         grid-template-columns: 1fr;
+    }
+    .weekday-detail-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .weekday-detail-head span {
+        flex-shrink: 1;
     }
     .btn-excel {
         width: 100%;

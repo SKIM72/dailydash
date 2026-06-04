@@ -131,7 +131,7 @@ export function compareTotals(current, previous) {
   return { diff, rate };
 }
 
-export function summarizeWeekdayPerformance(dailySummary) {
+export function summarizeWeekdayPerformance(dailySummary, transactions = []) {
   const weekdayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
   const totalSales = Object.values(dailySummary).reduce((sum, day) => sum + day.total, 0);
   const rows = weekdayNames.map((name, index) => ({
@@ -140,19 +140,86 @@ export function summarizeWeekdayPerformance(dailySummary) {
     total: 0,
     operatingDays: 0,
     average: 0,
-    ratio: 0
+    ratio: 0,
+    recentFourAverage: 0,
+    lastDate: '-',
+    lastTotal: 0,
+    previousDate: '-',
+    previousTotal: 0,
+    lastVsPreviousDiff: 0,
+    lastVsPreviousRate: null,
+    topDescription: null,
+    days: []
   }));
 
   Object.entries(dailySummary).forEach(([dateStr, day]) => {
     const index = parseDateKey(dateStr).getDay();
     const isOperating = isOperatingDay(day);
     rows[index].total += day.total;
-    if (isOperating) rows[index].operatingDays += 1;
+    if (isOperating) {
+      rows[index].operatingDays += 1;
+      rows[index].days.push({
+        date: dateStr,
+        total: day.total,
+        count: day.count
+      });
+    }
   });
 
+  const descriptionMap = new Map();
+  transactions.forEach((tx) => {
+    const dateStr = tx.transaction_date;
+    if (!dateStr || !dailySummary[dateStr]) return;
+
+    const sales = toNumber(tx.cash_income) + toNumber(tx.card_income);
+    if (sales <= 0) return;
+
+    const index = parseDateKey(dateStr).getDay();
+    const description = (tx.description || '미입력').trim() || '미입력';
+    const key = `${index}::${description}`;
+
+    if (!descriptionMap.has(key)) {
+      descriptionMap.set(key, {
+        weekdayIndex: index,
+        description,
+        total: 0,
+        people: 0,
+        rowCount: 0
+      });
+    }
+
+    const item = descriptionMap.get(key);
+    item.total += sales;
+    item.people += toNumber(tx.customer_count);
+    item.rowCount += 1;
+  });
+
+  const descriptions = [...descriptionMap.values()];
   rows.forEach((row) => {
     row.average = row.operatingDays > 0 ? Math.round(row.total / row.operatingDays) : 0;
     row.ratio = totalSales > 0 ? (row.total / totalSales) * 100 : 0;
+
+    const recentDays = row.days.slice(-4);
+    row.recentFourAverage = recentDays.length > 0
+      ? Math.round(recentDays.reduce((sum, day) => sum + day.total, 0) / recentDays.length)
+      : 0;
+
+    const last = row.days[row.days.length - 1] || null;
+    const previous = row.days[row.days.length - 2] || null;
+    if (last) {
+      row.lastDate = last.date;
+      row.lastTotal = last.total;
+    }
+    if (previous) {
+      row.previousDate = previous.date;
+      row.previousTotal = previous.total;
+      row.lastVsPreviousDiff = last.total - previous.total;
+      row.lastVsPreviousRate = previous.total > 0 ? (row.lastVsPreviousDiff / previous.total) * 100 : null;
+    }
+
+    row.topDescription = descriptions
+      .filter((item) => item.weekdayIndex === row.index)
+      .sort((a, b) => b.total - a.total || b.people - a.people || b.rowCount - a.rowCount)[0] || null;
   });
 
   const activeRows = rows.filter((row) => row.operatingDays > 0);
@@ -161,6 +228,7 @@ export function summarizeWeekdayPerformance(dailySummary) {
 
   return {
     rows,
+    activeRows,
     best: byAverageDesc[0] || null,
     slowest: byAverageAsc[0] || null
   };
@@ -466,6 +534,12 @@ export function createInsightMessages(summary, comparison = null, signals = {}) 
 
   if (signals.weekday?.best) {
     messages.push(`${signals.weekday.best.name} 평균 매출이 ${signals.weekday.best.average.toLocaleString()}원으로 가장 강합니다.`);
+    if (signals.weekday.best.recentFourAverage > 0) {
+      messages.push(`최근 4회 기준 ${signals.weekday.best.name} 평균은 ${signals.weekday.best.recentFourAverage.toLocaleString()}원입니다.`);
+    }
+    if (signals.weekday.best.topDescription) {
+      messages.push(`${signals.weekday.best.name} TOP 적요는 "${signals.weekday.best.topDescription.description}"이며 ${signals.weekday.best.topDescription.total.toLocaleString()}원입니다.`);
+    }
   }
 
   if (signals.descriptions?.top) {
