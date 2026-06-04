@@ -781,7 +781,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const expenseData = [];
         const customerData = [];
         const totalData = [];
-        const netData = [];
         const averageTicketData = [];
         
         // 요일별 누적 집계 데이터 공간 구성 (0: 일요일 ~ 6: 토요일)
@@ -797,7 +796,6 @@ document.addEventListener('DOMContentLoaded', () => {
             expenseData.push(data.expense || 0);
             customerData.push(data.count);
             totalData.push(data.total);
-            netData.push(data.net);
             averageTicketData.push(data.count > 0 ? Math.round(data.total / data.count) : 0);
             
             // 요일 정보 추출하여 가산
@@ -815,7 +813,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const chartModeCaption = {
-                sales: '총매출, 순매출, 지출을 한눈에 비교합니다.',
+                sales: '총매출과 지출 흐름을 중심으로 봅니다.',
                 payment: '현금과 카드 매출 비중을 누적 막대로 봅니다.',
                 people: '방문 인원과 객단가가 매출에 미치는 흐름을 봅니다.'
             };
@@ -831,18 +829,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             borderColor: '#3182f6',
                             borderWidth: 1,
                             borderRadius: 6,
-                            maxBarThickness: 44
-                        },
-                        {
-                            label: '순매출',
-                            data: netData,
-                            type: 'line',
-                            borderColor: '#16a34a',
-                            backgroundColor: '#16a34a',
-                            borderWidth: 3,
-                            pointRadius: 3,
-                            tension: 0.3,
-                            fill: false
+                            maxBarThickness: 44,
+                            order: 2
                         },
                         {
                             label: '현금 지출',
@@ -851,8 +839,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             borderColor: '#ef4444',
                             backgroundColor: '#ef4444',
                             borderDash: [5, 5],
-                            borderWidth: 2,
-                            pointRadius: 2,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBorderWidth: 2,
+                            pointBorderColor: '#ffffff',
+                            tension: 0.2,
+                            order: 1,
                             fill: false
                         }
                     ],
@@ -868,7 +861,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             backgroundColor: '#10b981',
                             stack: 'combinedSales',
                             borderRadius: 5,
-                            maxBarThickness: 42
+                            maxBarThickness: 42,
+                            order: 2
                         },
                         {
                             label: '카드 수입',
@@ -876,7 +870,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             backgroundColor: '#f59e0b',
                             stack: 'combinedSales',
                             borderRadius: 5,
-                            maxBarThickness: 42
+                            maxBarThickness: 42,
+                            order: 2
                         },
                         {
                             label: '현금 지출',
@@ -885,8 +880,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             borderColor: '#ef4444',
                             backgroundColor: '#ef4444',
                             borderDash: [5, 5],
-                            borderWidth: 2,
-                            pointRadius: 2,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBorderWidth: 2,
+                            pointBorderColor: '#ffffff',
+                            tension: 0.2,
+                            order: 1,
                             fill: false
                         }
                     ],
@@ -902,7 +902,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             backgroundColor: '#3182f6',
                             borderColor: '#3182f6',
                             borderRadius: 6,
-                            maxBarThickness: 42
+                            maxBarThickness: 42,
+                            order: 2
                         },
                         {
                             label: '객단가',
@@ -912,7 +913,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             backgroundColor: '#8b5cf6',
                             borderWidth: 3,
                             pointRadius: 3,
+                            pointHoverRadius: 6,
+                            pointBorderWidth: 2,
+                            pointBorderColor: '#ffffff',
                             tension: 0.3,
+                            order: 1,
                             fill: false
                         },
                         {
@@ -923,8 +928,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             backgroundColor: '#6366f1',
                             borderWidth: 3,
                             pointRadius: 3,
+                            pointHoverRadius: 6,
+                            pointBorderWidth: 2,
+                            pointBorderColor: '#ffffff',
                             tension: 0.3,
                             fill: false,
+                            order: 1,
                             yAxisID: 'yPeopleAxis'
                         }
                     ],
