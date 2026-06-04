@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isTrendOperatingDay(day) {
-        return day.count > 0 || day.total > 0 || day.expense > 0;
+        return day.count > 0 || day.cash > 0 || day.card > 0 || day.total > 0 || day.expense > 0;
     }
 
     function formatSignedRate(diff, baseValue) {
@@ -1064,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const movingAverageData = buildMovingAverage(totalData, 7);
 
             const chartModeCaption = {
-                sales: '총매출, 7일 평균, 지출 흐름을 함께 봅니다.',
+                sales: '현금+카드 총매출, 7일 평균, 지출 흐름을 함께 봅니다.',
                 payment: '현금과 카드 매출 비중을 누적 막대로 봅니다.',
                 people: '방문 인원과 객단가가 매출에 미치는 흐름을 봅니다.'
             };

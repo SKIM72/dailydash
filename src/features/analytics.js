@@ -33,7 +33,7 @@ function toNumber(value) {
 }
 
 function isOperatingDay(day) {
-  return day.count > 0 || day.total > 0 || day.expense > 0;
+  return day.count > 0 || day.cash > 0 || day.card > 0 || day.total > 0 || day.expense > 0;
 }
 
 function getAverageTicket(day) {
@@ -54,12 +54,19 @@ export function buildDailySummaryFromView(startStr, endStr, rows) {
     const dateStr = row.transaction_date;
     if (!dailySummary[dateStr]) return;
 
+    const cash = toNumber(row.total_cash);
+    const card = toNumber(row.total_card);
+    const expense = toNumber(row.total_expense);
+    const reportedTotal = toNumber(row.total_sales);
+    const computedTotal = cash + card;
+    const total = computedTotal > 0 ? computedTotal : reportedTotal;
+
     dailySummary[dateStr].count = toNumber(row.total_people);
-    dailySummary[dateStr].cash = toNumber(row.total_cash);
-    dailySummary[dateStr].expense = toNumber(row.total_expense);
-    dailySummary[dateStr].card = toNumber(row.total_card);
-    dailySummary[dateStr].total = toNumber(row.total_sales);
-    dailySummary[dateStr].net = toNumber(row.net_sales);
+    dailySummary[dateStr].cash = cash;
+    dailySummary[dateStr].expense = expense;
+    dailySummary[dateStr].card = card;
+    dailySummary[dateStr].total = total;
+    dailySummary[dateStr].net = total > 0 || expense > 0 ? total - expense : toNumber(row.net_sales);
   });
 
   return dailySummary;
