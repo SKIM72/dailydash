@@ -159,7 +159,7 @@
         </main>
 
         <main class="main-content" id="viewMonthly" style="display: none; flex-direction: column;">
-            <section class="dashboard-section" style="width: 100%;">
+            <section class="dashboard-section stats-overview-section">
                 <div class="section-header">
                     <h2 style="margin: 0;"><i class="fas fa-calendar-alt"></i> 월간 상세 요약</h2>
                     <div class="custom-date-picker" style="min-width: 180px;">
@@ -168,7 +168,7 @@
                         <input type="month" id="currentMonth" required>
                     </div>
                 </div>
-                <div class="summary-cards">
+                <div class="summary-cards stats-primary-grid">
                     <div class="card card-primary"><h3>총 매출 (현금+카드)</h3><p id="monthTotalSales" class="amount">0</p></div>
                     <div class="card card-success"><h3>현금 누적</h3><p id="monthTotalCash" class="amount">0</p></div>
                     <div class="card card-warning"><h3>카드 누적</h3><p id="monthTotalCard" class="amount">0</p></div>
@@ -177,7 +177,7 @@
                     <div class="card card-purple"><h3>총 방문 인원</h3><p id="monthTotalCount" class="amount count">0</p></div>
                 </div>
 
-                <div class="summary-cards" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 20px;">
+                <div class="summary-cards stats-secondary-grid">
                     <div class="card" style="border-left: 4px solid #6366f1;"><h3>영업일 평균 매출액</h3><p id="monthAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
                     <div class="card" style="border-left: 4px solid #111827;"><h3>객단가</h3><p id="monthAvgTicket" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
                     <div class="card" style="border-left: 4px solid #3182f6;"><h3>전월 대비</h3><p id="monthCompareSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">-</p></div>
@@ -191,25 +191,27 @@
                 </div>
             </section>
 
-            <section class="dashboard-section" style="width: 100%;">
-                <div class="section-header">
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <h2><i class="fas fa-table"></i> 일자별 누적 현황</h2>
-                        <span style="font-size:0.85rem; color:var(--text-muted);">(행을 클릭하면 해당 일자의 건별 상세 내역이 표기됩니다)</span>
+            <details class="fold-section" id="monthlyDetailFold">
+                <summary>
+                    <span class="fold-title"><i class="fas fa-table"></i> 일자별 누적 현황</span>
+                    <span id="monthlyDetailMeta" class="fold-summary-meta">월 선택</span>
+                </summary>
+                <div class="fold-body">
+                    <div class="fold-actions">
+                        <button id="downloadExcelBtn" class="btn-secondary btn-excel"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
                     </div>
-                    <button id="downloadExcelBtn" class="btn-secondary" style="margin-top:0; width:auto; padding: 8px 16px; background:#22c55e; color:white; border:none; border-radius:8px; font-weight:600;"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
+                    <div class="table-container">
+                        <table id="monthlyTable">
+                            <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
+                            <tbody id="monthlyTableBody"><tr><td colspan="11" class="empty-msg">데이터가 없습니다.</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="table-container">
-                    <table id="monthlyTable">
-                        <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
-                        <tbody id="monthlyTableBody"><tr><td colspan="11" class="empty-msg">데이터가 없습니다.</td></tr></tbody>
-                    </table>
-                </div>
-            </section>
+            </details>
         </main>
 
         <main class="main-content" id="viewTotal" style="display: none; flex-direction: column;">
-            <section class="dashboard-section" style="width: 100%;">
+            <section class="dashboard-section stats-overview-section">
                 <div class="section-header" style="flex-wrap: wrap; gap: 15px;">
                     <h2><i class="fas fa-chart-pie"></i> 기간별 총 통계 분석</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -228,7 +230,7 @@
                     </div>
                 </div>
 
-                <div class="summary-cards" style="margin-top: 10px;">
+                <div class="summary-cards stats-primary-grid">
                     <div class="card card-primary"><h3>지정 기간 총 매출</h3><p id="rangeTotalSales" class="amount">0</p></div>
                     <div class="card card-success"><h3>현금 매출 합계</h3><p id="rangeTotalCash" class="amount">0</p></div>
                     <div class="card card-warning"><h3>카드 매출 합계</h3><p id="rangeTotalCard" class="amount">0</p></div>
@@ -237,7 +239,7 @@
                     <div class="card card-purple"><h3>총 누적 인원</h3><p id="rangeTotalCount" class="amount count">0</p></div>
                 </div>
                 
-                <div class="summary-cards" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 20px;">
+                <div class="summary-cards stats-secondary-grid">
                     <div class="card" style="border-left: 4px solid #6366f1;"><h3>영업일 평균 매출</h3><p id="rangeAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
                     <div class="card" style="border-left: 4px solid #111827;"><h3>객단가</h3><p id="rangeAvgTicket" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
                     <div class="card" style="border-left: 4px solid #3182f6;"><h3>이전 동기간 대비</h3><p id="rangeCompareSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">-</p></div>
@@ -251,33 +253,46 @@
                 </div>
             </section>
 
-            <div class="analytics-dashboard-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; flex-wrap: wrap;">
-                <section class="dashboard-section" style="margin-bottom: 0;">
-                    <div class="section-header"><h2><i class="fas fa-chart-bar"></i> 매출 결제수단별 추이 & 방문 인원 상관관계</h2></div>
-                    <div style="position: relative; width: 100%; height: 320px;">
-                        <canvas id="totalTrendChart"></canvas>
+            <details class="fold-section" id="rangeChartFold">
+                <summary>
+                    <span class="fold-title"><i class="fas fa-chart-bar"></i> 매출 흐름 분석</span>
+                    <span id="rangeChartMeta" class="fold-summary-meta">기간 선택</span>
+                </summary>
+                <div class="fold-body">
+                    <div class="analytics-dashboard-grid">
+                        <section class="dashboard-section inner-analysis-section">
+                            <div class="section-header"><h2><i class="fas fa-chart-bar"></i> 매출 추이</h2></div>
+                            <div class="chart-wrap">
+                                <canvas id="totalTrendChart"></canvas>
+                            </div>
+                        </section>
+                        <section class="dashboard-section inner-analysis-section">
+                            <div class="section-header"><h2><i class="fas fa-calendar-week"></i> 요일별 기여도</h2></div>
+                            <div id="weekdayContributionWrap" class="weekday-wrap">
+                                <div class="empty-compact">데이터 조회 전</div>
+                            </div>
+                        </section>
                     </div>
-                </section>
-                <section class="dashboard-section" style="margin-bottom: 0;">
-                    <div class="section-header"><h2><i class="fas fa-calendar-week"></i> 요일별 매출 기여도 요약</h2></div>
-                    <div id="weekdayContributionWrap" style="display: flex; flex-direction: column; gap: 12px; justify-content: center; height: calc(100% - 50px);">
-                        <div style="text-align: center; color: var(--text-muted); font-size: 0.95rem; padding: 20px;">데이터를 조회하면 요일별 집중도가 분석됩니다.</div>
-                    </div>
-                </section>
-            </div>
+                </div>
+            </details>
 
-            <section class="dashboard-section" style="width: 100%;">
-                <div class="section-header">
-                    <h2><i class="fas fa-list-alt"></i> 상세 일자별 통계 리스트</h2>
-                    <button id="downloadTotalExcelBtn" class="btn-secondary" style="margin-top:0; width:auto; padding: 8px 16px; background:#22c55e; color:white; border:none; border-radius:8px; font-weight:600;"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
+            <details class="fold-section" id="rangeDetailFold">
+                <summary>
+                    <span class="fold-title"><i class="fas fa-list-alt"></i> 상세 일자별 통계</span>
+                    <span id="rangeDetailMeta" class="fold-summary-meta">기간 선택</span>
+                </summary>
+                <div class="fold-body">
+                    <div class="fold-actions">
+                        <button id="downloadTotalExcelBtn" class="btn-secondary btn-excel"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="totalRangeTable">
+                            <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
+                            <tbody id="totalTableBody"><tr><td colspan="11" class="empty-msg">시작일과 종료일을 지정한 후 조회하기를 눌러주세요.</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="table-container">
-                    <table id="totalRangeTable">
-                        <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
-                        <tbody id="totalTableBody"><tr><td colspan="11" class="empty-msg">시작일과 종료일을 지정한 후 조회하기를 눌러주세요.</td></tr></tbody>
-                    </table>
-                </div>
-            </section>
+            </details>
         </main>
     </div>
 

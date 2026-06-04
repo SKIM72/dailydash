@@ -522,10 +522,12 @@ document.addEventListener('DOMContentLoaded', () => {
             setText('monthMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay.substring(5)}일 (${summary.maxSales.toLocaleString()}원)` : '-');
             setText('monthCashRatio', formatPercent(summary.cashRatio));
             setText('monthOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
+            setText('monthlyDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
             renderInsightList('monthInsightList', createInsightMessages(summary, comparison));
 
         } catch (err) {
             console.error(err);
+            setText('monthlyDetailMeta', '조회 실패');
             monthlyTableBody.innerHTML = `<tr><td colspan="11" class="empty-msg" style="color: var(--danger);">통계 데이터를 불러오지 못했습니다.</td></tr>`;
         }
     }
@@ -722,13 +724,19 @@ document.addEventListener('DOMContentLoaded', () => {
             setText('rangeMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay} (${summary.maxSales.toLocaleString()}원)` : '-');
             setText('rangeCashRatio', formatPercent(summary.cashRatio));
             setText('rangeOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
+            setText('rangeChartMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatComparisonText(comparison)}`);
+            setText('rangeDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
             renderInsightList('rangeInsightList', createInsightMessages(summary, comparison));
 
             // 신규 시각화 함수 연동 파이프라인 배치
+            const chartFold = document.getElementById('rangeChartFold');
+            if (chartFold) chartFold.open = true;
             renderAdvancedAnalytics(dailySummary);
 
         } catch (err) {
             console.error(err);
+            setText('rangeChartMeta', '조회 실패');
+            setText('rangeDetailMeta', '조회 실패');
             totalTableBody.innerHTML = `<tr><td colspan="11" class="empty-msg" style="color: var(--danger);">데이터 로드 중 에러가 발생했습니다.</td></tr>`;
         }
     }
