@@ -367,6 +367,134 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     background: var(--primary);
 }
 
+.analysis-panels {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.analysis-panel {
+    min-width: 0;
+    padding: 18px;
+    background: var(--insight-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.analysis-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-weight: 900;
+}
+
+.analysis-panel-title i {
+    color: var(--primary);
+}
+
+.signal-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.signal-item {
+    display: grid;
+    gap: 2px;
+    padding: 12px;
+    background: var(--main-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.signal-item span {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.signal-item strong {
+    min-width: 0;
+    color: var(--text-main);
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.signal-item small {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.ranking-list {
+    display: grid;
+    gap: 10px;
+}
+
+.ranking-item {
+    display: grid;
+    gap: 7px;
+    padding: 12px;
+    background: var(--main-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.ranking-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.ranking-head strong {
+    min-width: 0;
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-weight: 900;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ranking-head span {
+    flex-shrink: 0;
+    color: var(--primary);
+    font-size: 0.92rem;
+    font-weight: 900;
+}
+
+.ranking-meta {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.ranking-bar {
+    height: 7px;
+    overflow: hidden;
+    background: var(--side-bg);
+    border-radius: 999px;
+}
+
+.ranking-bar div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border-radius: inherit;
+}
+
+.trend-positive { color: var(--secondary) !important; }
+.trend-negative { color: var(--danger) !important; }
+.trend-neutral { color: var(--text-main) !important; }
+
 .fold-section {
     width: 100%;
     background: var(--main-bg);
@@ -577,6 +705,9 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     }
     .fold-actions {
         justify-content: stretch;
+    }
+    .analysis-panels {
+        grid-template-columns: 1fr;
     }
     .btn-excel {
         width: 100%;

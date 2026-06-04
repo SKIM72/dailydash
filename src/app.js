@@ -4,7 +4,14 @@ import { installModalHandlers } from './shared/modal.js';
 import { appendCell, setText } from './shared/dom.js';
 import { formatCommas, formatPercent, formatWon, parseCommas } from './shared/format.js';
 import { formatDateKey, getDayName, getKstToday, getPreviousMonth, parseDateKey } from './shared/date.js';
-import { buildDailySummaryFromView, compareTotals, createInsightMessages, summarizeDailyMap } from './features/analytics.js';
+import {
+    buildDailySummaryFromView,
+    compareTotals,
+    createInsightMessages,
+    summarizeDailyMap,
+    summarizeDescriptions,
+    summarizeWeekdayPerformance
+} from './features/analytics.js';
 import { installThemeControls } from './shared/theme.js';
 
 installModalHandlers();
@@ -150,6 +157,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return data || [];
     }
 
+    async function fetchTransactionsForRange(startStr, endStr) {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select('transaction_date, description, customer_count, cash_income, cash_expense, card_income')
+            .gte('transaction_date', startStr)
+            .lte('transaction_date', endStr)
+            .is('deleted_at', null)
+            .order('transaction_date', { ascending: true })
+            .range(0, 4999);
+
+        if (error) throw error;
+        return data || [];
+    }
+
     function renderInsightList(listId, messages) {
         const list = document.getElementById(listId);
         if (!list) return;
@@ -165,6 +186,131 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!comparison || comparison.rate === null) return '비교 없음';
         const sign = comparison.diff >= 0 ? '+' : '-';
         return `${sign}${Math.abs(Math.round(comparison.rate)).toLocaleString()}%`;
+    }
+
+    function formatCompactWon(value) {
+        const absValue = Math.abs(Number(value) || 0);
+        if (absValue >= 100000000) {
+            const amount = absValue / 100000000;
+            return `${Number.isInteger(amount) ? amount.toLocaleString() : amount.toFixed(1)}억원`;
+        }
+        if (absValue >= 10000) {
+            const amount = absValue / 10000;
+            return `${Number.isInteger(amount) ? amount.toLocaleString() : amount.toFixed(1)}만원`;
+        }
+        return `${absValue.toLocaleString()}원`;
+    }
+
+    function formatComparisonDetail(comparison) {
+        if (!comparison || comparison.rate === null) return '비교 없음';
+        const sign = comparison.diff >= 0 ? '+' : '-';
+        return `${sign}${Math.abs(Math.round(comparison.rate)).toLocaleString()}% · ${sign}${formatCompactWon(comparison.diff)}`;
+    }
+
+    function setTrendValue(elementId, comparison) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        element.classList.remove('trend-positive', 'trend-negative', 'trend-neutral');
+        element.classList.add(comparison?.diff > 0 ? 'trend-positive' : comparison?.diff < 0 ? 'trend-negative' : 'trend-neutral');
+        element.textContent = formatComparisonDetail(comparison);
+    }
+
+    function renderWeekdaySignals(containerId, weekdaySummary) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.replaceChildren();
+
+        if (!weekdaySummary.best) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-compact';
+            empty.textContent = '조회 기간에 요일 분석 데이터가 없습니다.';
+            container.appendChild(empty);
+            return;
+        }
+
+        const signals = [
+            {
+                label: '강한 요일',
+                value: `${weekdaySummary.best.name} · ${formatWon(weekdaySummary.best.average)}`,
+                meta: `${weekdaySummary.best.operatingDays.toLocaleString()}영업일 평균`
+            }
+        ];
+
+        if (weekdaySummary.slowest && weekdaySummary.slowest.name !== weekdaySummary.best.name) {
+            signals.push({
+                label: '보완 요일',
+                value: `${weekdaySummary.slowest.name} · ${formatWon(weekdaySummary.slowest.average)}`,
+                meta: `${weekdaySummary.slowest.operatingDays.toLocaleString()}영업일 평균`
+            });
+        }
+
+        signals.push({
+            label: '매출 집중도',
+            value: `${Math.round(weekdaySummary.best.ratio).toLocaleString()}%`,
+            meta: `${weekdaySummary.best.name} 누적 비중`
+        });
+
+        signals.forEach((signal) => {
+            const item = document.createElement('div');
+            item.className = 'signal-item';
+
+            const label = document.createElement('span');
+            label.textContent = signal.label;
+
+            const value = document.createElement('strong');
+            value.textContent = signal.value;
+
+            const meta = document.createElement('small');
+            meta.textContent = signal.meta;
+
+            item.append(label, value, meta);
+            container.appendChild(item);
+        });
+    }
+
+    function renderDescriptionRanking(containerId, descriptionSummary) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.replaceChildren();
+
+        if (!descriptionSummary.items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-compact';
+            empty.textContent = '적요별 매출 데이터가 없습니다.';
+            container.appendChild(empty);
+            return;
+        }
+
+        const maxTotal = descriptionSummary.items[0].total || 1;
+        descriptionSummary.items.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = 'ranking-item';
+
+            const head = document.createElement('div');
+            head.className = 'ranking-head';
+
+            const name = document.createElement('strong');
+            name.textContent = `${index + 1}. ${item.description}`;
+
+            const amount = document.createElement('span');
+            amount.textContent = formatWon(item.total);
+
+            head.append(name, amount);
+
+            const meta = document.createElement('div');
+            meta.className = 'ranking-meta';
+            meta.textContent = `${item.people.toLocaleString()}명 · ${item.rowCount.toLocaleString()}건 · 비중 ${Math.round(item.ratio).toLocaleString()}%`;
+
+            const bar = document.createElement('div');
+            bar.className = 'ranking-bar';
+
+            const fill = document.createElement('div');
+            fill.style.width = `${Math.max(6, Math.round((item.total / maxTotal) * 100))}%`;
+            bar.appendChild(fill);
+
+            row.append(head, meta, bar);
+            container.appendChild(row);
+        });
     }
 
     function getPreviousRange(startStr, endStr) {
@@ -471,6 +617,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const prevSummaryRows = await fetchDailySalesSummary(prevStartDate, prevEndDate);
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(prevStartDate, prevEndDate, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
+            const transactions = await fetchTransactionsForRange(startDate, endDate);
+            const weekdaySummary = summarizeWeekdayPerformance(dailySummary);
+            const descriptionSummary = summarizeDescriptions(transactions);
 
             monthlyTableBody.innerHTML = '';
             let accCount = 0, accCash = 0, accExpense = 0, accCard = 0, accTotal = 0, accNet = 0;
@@ -520,12 +669,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setText('monthAvgSales', summary.averageSales.toLocaleString() + " 원");
             setText('monthAvgTicket', summary.averageTicket.toLocaleString() + " 원");
-            setText('monthCompareSales', formatComparisonText(comparison));
+            setTrendValue('monthCompareSales', comparison);
             setText('monthMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay.substring(5)}일 (${summary.maxSales.toLocaleString()}원)` : '-');
             setText('monthCashRatio', formatPercent(summary.cashRatio));
             setText('monthOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
             setText('monthlyDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
-            renderInsightList('monthInsightList', createInsightMessages(summary, comparison));
+            renderWeekdaySignals('monthWeekdaySignals', weekdaySummary);
+            renderDescriptionRanking('monthDescriptionRanking', descriptionSummary);
+            renderInsightList('monthInsightList', createInsightMessages(summary, comparison, {
+                weekday: weekdaySummary,
+                descriptions: descriptionSummary
+            }));
 
         } catch (err) {
             console.error(err);
@@ -683,6 +837,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const prevSummaryRows = await fetchDailySalesSummary(previousRange.startStr, previousRange.endStr);
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(previousRange.startStr, previousRange.endStr, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
+            const transactions = await fetchTransactionsForRange(startStr, endStr);
+            const weekdaySummary = summarizeWeekdayPerformance(dailySummary);
+            const descriptionSummary = summarizeDescriptions(transactions);
 
             totalTableBody.innerHTML = '';
             let accCount = 0, accCash = 0, accExpense = 0, accCard = 0, accTotal = 0, accNet = 0;
@@ -722,13 +879,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setText('rangeAvgSales', summary.averageSales.toLocaleString() + " 원");
             setText('rangeAvgTicket', summary.averageTicket.toLocaleString() + " 원");
-            setText('rangeCompareSales', formatComparisonText(comparison));
+            setTrendValue('rangeCompareSales', comparison);
             setText('rangeMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay} (${summary.maxSales.toLocaleString()}원)` : '-');
             setText('rangeCashRatio', formatPercent(summary.cashRatio));
             setText('rangeOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
             setText('rangeChartMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatComparisonText(comparison)}`);
             setText('rangeDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
-            renderInsightList('rangeInsightList', createInsightMessages(summary, comparison));
+            renderWeekdaySignals('rangeWeekdaySignals', weekdaySummary);
+            renderDescriptionRanking('rangeDescriptionRanking', descriptionSummary);
+            renderInsightList('rangeInsightList', createInsightMessages(summary, comparison, {
+                weekday: weekdaySummary,
+                descriptions: descriptionSummary
+            }));
 
             // 신규 시각화 함수 연동 파이프라인 배치
             const chartFold = document.getElementById('rangeChartFold');
