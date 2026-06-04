@@ -78,8 +78,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) {
             el.addEventListener('input', (e) => {
                 e.target.value = formatCommas(e.target.value);
+                updateEntryPreview();
             });
         }
+    });
+
+    document.querySelectorAll('.quick-amount-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const input = document.getElementById(button.dataset.target);
+            if (!input) return;
+
+            if (button.dataset.clear === 'true') {
+                input.value = '';
+            } else {
+                const nextValue = parseCommas(input.value) + parseCommas(button.dataset.amount);
+                input.value = formatCommas(nextValue);
+            }
+
+            updateEntryPreview();
+            input.focus();
+        });
     });
 
     // 커스텀 요일 표기 디스플레이 유틸리티
@@ -101,6 +119,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         document.getElementById(displayId).textContent = `${inputEl.value} (${getDayName(inputEl.value)})`;
+    }
+
+    function updateEntryPreview() {
+        const count = parseCommas(document.getElementById('count')?.value);
+        const cashIn = parseCommas(document.getElementById('cashIn')?.value);
+        const cardIn = parseCommas(document.getElementById('cardIn')?.value);
+        const cashOut = parseCommas(document.getElementById('cashOut')?.value);
+        const totalSales = cashIn + cardIn;
+        const netCash = cashIn - cashOut;
+        const averageTicket = count > 0 ? Math.round(totalSales / count) : 0;
+
+        setText('entrySalesPreview', formatWon(totalSales));
+        setText('entryCashPreview', formatWon(netCash));
+        setText('entryTicketPreview', formatWon(averageTicket));
+        document.getElementById('entryCashPreview')?.classList.toggle('is-negative', netCash < 0);
     }
 
     async function fetchDailySalesSummary(startStr, endStr) {
@@ -332,8 +365,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             form.reset();
             ['count','cashIn','cardIn','cashOut'].forEach(id => document.getElementById(id).value = '');
+            updateEntryPreview();
             await loadDailyData(date);
             await window.showAlert("입력이 완료되었습니다.");
+            document.getElementById('desc')?.focus();
         } catch (error) {
             await window.showAlert("저장 실패: " + error.message);
         } finally {

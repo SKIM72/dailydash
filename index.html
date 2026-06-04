@@ -71,25 +71,58 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="count">인원</label>
-                            <input type="text" id="count" placeholder="인원수 입력">
+                            <input type="text" id="count" inputmode="numeric" autocomplete="off" placeholder="인원수 입력">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="cashIn">현금 수입</label>
-                            <input type="text" id="cashIn" placeholder="현금 금액 입력">
+                            <input type="text" id="cashIn" inputmode="numeric" autocomplete="off" placeholder="현금 금액 입력">
+                            <div class="quick-amounts" aria-label="현금 수입 빠른 입력">
+                                <button type="button" class="quick-amount-btn" data-target="cashIn" data-amount="5000">+5천</button>
+                                <button type="button" class="quick-amount-btn" data-target="cashIn" data-amount="10000">+1만</button>
+                                <button type="button" class="quick-amount-btn" data-target="cashIn" data-amount="50000">+5만</button>
+                                <button type="button" class="quick-amount-btn quick-clear-btn" data-target="cashIn" data-clear="true">지움</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="cardIn">카드 수입</label>
-                            <input type="text" id="cardIn" placeholder="카드 금액 입력">
+                            <input type="text" id="cardIn" inputmode="numeric" autocomplete="off" placeholder="카드 금액 입력">
+                            <div class="quick-amounts" aria-label="카드 수입 빠른 입력">
+                                <button type="button" class="quick-amount-btn" data-target="cardIn" data-amount="5000">+5천</button>
+                                <button type="button" class="quick-amount-btn" data-target="cardIn" data-amount="10000">+1만</button>
+                                <button type="button" class="quick-amount-btn" data-target="cardIn" data-amount="50000">+5만</button>
+                                <button type="button" class="quick-amount-btn quick-clear-btn" data-target="cardIn" data-clear="true">지움</button>
+                            </div>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="cashOut">현금 지출</label>
-                        <input type="text" id="cashOut" placeholder="지출 금액 입력">
+                        <input type="text" id="cashOut" inputmode="numeric" autocomplete="off" placeholder="지출 금액 입력">
+                        <div class="quick-amounts" aria-label="현금 지출 빠른 입력">
+                            <button type="button" class="quick-amount-btn" data-target="cashOut" data-amount="5000">+5천</button>
+                            <button type="button" class="quick-amount-btn" data-target="cashOut" data-amount="10000">+1만</button>
+                            <button type="button" class="quick-amount-btn" data-target="cashOut" data-amount="50000">+5만</button>
+                            <button type="button" class="quick-amount-btn quick-clear-btn" data-target="cashOut" data-clear="true">지움</button>
+                        </div>
                     </div>
                     <div class="form-group"><label for="remark1">비고 1</label><input type="text" id="remark1" placeholder="추가 내용"></div>
                     <div class="form-group"><label for="remark2">비고 2</label><input type="text" id="remark2" placeholder="고객 이름 등"></div>
+
+                    <div class="entry-preview" aria-live="polite">
+                        <div class="entry-preview-item">
+                            <span>입력 매출</span>
+                            <strong id="entrySalesPreview">0원</strong>
+                        </div>
+                        <div class="entry-preview-item">
+                            <span>순현금</span>
+                            <strong id="entryCashPreview">0원</strong>
+                        </div>
+                        <div class="entry-preview-item">
+                            <span>객단가</span>
+                            <strong id="entryTicketPreview">0원</strong>
+                        </div>
+                    </div>
                     
                     <button type="submit" id="submitTransactionBtn" class="btn-submit"><i class="fas fa-check"></i> 입력하기</button>
                 </form>

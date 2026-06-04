@@ -119,6 +119,82 @@ body {
 
 .month-picker { width: auto !important; min-width: 140px; flex-shrink: 0; padding: 8px 12px !important; font-size: 1rem !important; cursor: pointer; background: var(--side-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text-main); transition: all 0.2s; }
 
+.quick-amounts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.quick-amount-btn {
+    min-height: 34px;
+    border-radius: 8px;
+    background: #eef6ff;
+    color: var(--primary);
+    border: 1px solid #d8eaff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.quick-amount-btn:hover {
+    background: #e2f0ff;
+    border-color: #b9dcff;
+}
+
+.quick-amount-btn:active {
+    transform: scale(0.97);
+}
+
+.quick-clear-btn {
+    background: #f8fafc;
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
+.entry-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 8px 0 6px;
+    padding: 10px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.entry-preview-item {
+    min-width: 0;
+    padding: 10px 8px;
+    background: var(--main-bg);
+    border: 1px solid #eef2f7;
+    border-radius: 8px;
+}
+
+.entry-preview-item span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.entry-preview-item strong {
+    display: block;
+    color: var(--text-main);
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.entry-preview-item:first-child strong { color: var(--primary); }
+.entry-preview-item:nth-child(2) strong { color: var(--secondary); }
+.entry-preview-item strong.is-negative { color: var(--danger); }
+
 button { border: none; font-family: var(--font-family); }
 .btn-submit { background: var(--primary); color: white; border-radius: 10px; padding: 14px; font-size: 1.05rem; font-weight: 700; width: 100%; margin-top: 10px; cursor: pointer; transition: 0.2s; }
 .btn-submit:hover { background: var(--primary-hover); }
