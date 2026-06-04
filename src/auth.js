@@ -1,8 +1,10 @@
 import '../style.css';
 import { createSupabaseClient } from './services/supabaseClient.js';
 import { installModalHandlers } from './shared/modal.js';
+import { initTheme } from './shared/theme.js';
 
 installModalHandlers();
+initTheme();
 
 const supabaseClient = createSupabaseClient();
 

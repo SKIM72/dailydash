@@ -5,8 +5,10 @@ import { appendCell, setText } from './shared/dom.js';
 import { formatCommas, formatPercent, formatWon, parseCommas } from './shared/format.js';
 import { formatDateKey, getDayName, getKstToday, getPreviousMonth, parseDateKey } from './shared/date.js';
 import { buildDailySummaryFromView, compareTotals, createInsightMessages, summarizeDailyMap } from './features/analytics.js';
+import { installThemeControls } from './shared/theme.js';
 
 installModalHandlers();
+installThemeControls();
 
 document.addEventListener('DOMContentLoaded', () => {
 
