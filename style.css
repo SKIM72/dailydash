@@ -668,6 +668,54 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     gap: 10px;
 }
 
+.description-signal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.description-signal-item {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    padding: 10px;
+    background: var(--main-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.description-signal-item span {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 900;
+}
+
+.description-signal-item strong {
+    min-width: 0;
+    color: var(--text-main);
+    font-size: 0.92rem;
+    font-weight: 900;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.description-signal-item small {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.description-signal-item.is-positive strong,
+.description-signal-item.is-positive small {
+    color: var(--secondary);
+}
+
+.description-signal-item.is-negative strong,
+.description-signal-item.is-negative small {
+    color: var(--danger);
+}
+
 .ranking-item {
     display: grid;
     gap: 7px;
@@ -706,6 +754,45 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     color: var(--text-muted);
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.ranking-detail-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ranking-detail-row span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--side-bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 900;
+}
+
+.ranking-detail-row span.is-positive {
+    background: color-mix(in srgb, var(--secondary) 12%, var(--main-bg));
+    border-color: color-mix(in srgb, var(--secondary) 32%, var(--border));
+    color: var(--secondary);
+}
+
+.ranking-detail-row span.is-negative {
+    background: color-mix(in srgb, var(--danger) 10%, var(--main-bg));
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+    color: var(--danger);
+}
+
+.ranking-variants {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
 }
 
 .ranking-bar {

@@ -367,6 +367,31 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function formatDescriptionGrowth(item) {
+        if (!item) return '비교 없음';
+        if (item.previousTotal === 0 && item.total > 0) return '신규/재등장';
+        if (item.growthRate === null) return '비교 없음';
+        return `${formatSignedRate(item.growthDiff, item.previousTotal)} · ${formatSignedAmount(item.growthDiff)}`;
+    }
+
+    function appendDescriptionSignal(container, label, value, meta, tone = '') {
+        const item = document.createElement('div');
+        item.className = 'description-signal-item';
+        if (tone) item.classList.add(tone);
+
+        const labelNode = document.createElement('span');
+        labelNode.textContent = label;
+
+        const valueNode = document.createElement('strong');
+        valueNode.textContent = value;
+
+        const metaNode = document.createElement('small');
+        metaNode.textContent = meta;
+
+        item.append(labelNode, valueNode, metaNode);
+        container.appendChild(item);
+    }
+
     function renderWeekdaySignals(containerId, weekdaySummary) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -475,6 +500,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const signalGrid = document.createElement('div');
+        signalGrid.className = 'description-signal-grid';
+
+        if (descriptionSummary.rising) {
+            appendDescriptionSignal(
+                signalGrid,
+                '최근 뜨는 적요',
+                descriptionSummary.rising.description,
+                `최근 7일 ${formatWon(descriptionSummary.rising.recentTotal)}`
+            );
+        }
+
+        if (descriptionSummary.growth) {
+            appendDescriptionSignal(
+                signalGrid,
+                descriptionSummary.comparisonLabel,
+                descriptionSummary.growth.description,
+                formatDescriptionGrowth(descriptionSummary.growth),
+                getTrendTone(descriptionSummary.growth.growthDiff)
+            );
+        }
+
+        appendDescriptionSignal(
+            signalGrid,
+            '자동 묶음',
+            `${descriptionSummary.groupedCount.toLocaleString()}개`,
+            descriptionSummary.groupedCount > 0 ? '비슷한 적요를 합산 표시' : '묶을 적요 없음'
+        );
+
+        container.appendChild(signalGrid);
+
         const maxTotal = descriptionSummary.items[0].total || 1;
         descriptionSummary.items.forEach((item, index) => {
             const row = document.createElement('div');
@@ -493,7 +549,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const meta = document.createElement('div');
             meta.className = 'ranking-meta';
-            meta.textContent = `${item.people.toLocaleString()}명 · ${item.rowCount.toLocaleString()}건 · 비중 ${Math.round(item.ratio).toLocaleString()}%`;
+            meta.textContent = `${item.people.toLocaleString()}명 · ${item.rowCount.toLocaleString()}건 · 객단가 ${formatWon(item.averageTicket)} · 비중 ${Math.round(item.ratio).toLocaleString()}%`;
+
+            const detail = document.createElement('div');
+            detail.className = 'ranking-detail-row';
+
+            const recentPill = document.createElement('span');
+            recentPill.textContent = `최근 7일 ${formatWon(item.recentTotal)}`;
+
+            const growthPill = document.createElement('span');
+            growthPill.textContent = `${descriptionSummary.comparisonLabel} ${formatDescriptionGrowth(item)}`;
+            const growthTone = getTrendTone(item.growthDiff);
+            if (growthTone) growthPill.classList.add(growthTone);
+
+            detail.append(recentPill, growthPill);
+
+            let variants = null;
+            if (item.variantCount > 1) {
+                variants = document.createElement('div');
+                variants.className = 'ranking-variants';
+                variants.textContent = `자동 묶음: ${item.variants.join(', ')}`;
+            }
 
             const bar = document.createElement('div');
             bar.className = 'ranking-bar';
@@ -502,7 +578,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fill.style.width = `${Math.max(6, Math.round((item.total / maxTotal) * 100))}%`;
             bar.appendChild(fill);
 
-            row.append(head, meta, bar);
+            row.append(head, meta, detail);
+            if (variants) row.appendChild(variants);
+            row.appendChild(bar);
             container.appendChild(row);
         });
     }
@@ -992,8 +1070,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(prevStartDate, prevEndDate, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
             const transactions = await fetchTransactionsForRange(startDate, endDate);
+            const previousTransactions = await fetchTransactionsForRange(prevStartDate, prevEndDate);
             const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
-            const descriptionSummary = summarizeDescriptions(transactions);
+            const descriptionSummary = summarizeDescriptions(transactions, {
+                previousTransactions,
+                comparisonLabel: '전월 대비'
+            });
 
             monthlyTableBody.innerHTML = '';
             let accCount = 0, accCash = 0, accExpense = 0, accCard = 0, accTotal = 0, accNet = 0;
@@ -1349,8 +1431,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(previousRange.startStr, previousRange.endStr, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
             const transactions = await fetchTransactionsForRange(startStr, endStr);
+            const previousTransactions = await fetchTransactionsForRange(previousRange.startStr, previousRange.endStr);
             const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
-            const descriptionSummary = summarizeDescriptions(transactions);
+            const descriptionSummary = summarizeDescriptions(transactions, {
+                previousTransactions,
+                comparisonLabel: '이전 기간 대비'
+            });
 
             totalTableBody.innerHTML = '';
             let accCount = 0, accCash = 0, accExpense = 0, accCard = 0, accTotal = 0, accNet = 0;

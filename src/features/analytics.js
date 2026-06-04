@@ -40,6 +40,158 @@ function getAverageTicket(day) {
   return day.count > 0 ? Math.round(day.total / day.count) : 0;
 }
 
+const DESCRIPTION_ALIASES = new Map([
+  ['미수가루', '미숫가루'],
+  ['미숫가루', '미숫가루']
+]);
+
+function normalizeDescription(description) {
+  const original = (description || '미입력').trim() || '미입력';
+  const compact = original
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]/g, '');
+  const key = DESCRIPTION_ALIASES.get(compact) || compact || '미입력';
+  const label = DESCRIPTION_ALIASES.get(compact) || original;
+  return { key, label, original };
+}
+
+function getEditDistance(a, b) {
+  const left = [...a];
+  const right = [...b];
+  const costs = Array.from({ length: left.length + 1 }, (_, index) => index);
+
+  for (let row = 1; row <= right.length; row += 1) {
+    let previous = costs[0];
+    costs[0] = row;
+
+    for (let col = 1; col <= left.length; col += 1) {
+      const current = costs[col];
+      const substitution = previous + (left[col - 1] === right[row - 1] ? 0 : 1);
+      costs[col] = Math.min(costs[col] + 1, costs[col - 1] + 1, substitution);
+      previous = current;
+    }
+  }
+
+  return costs[left.length];
+}
+
+function resolveDescriptionKey(map, normalizedKey) {
+  if (map.has(normalizedKey)) return normalizedKey;
+  if (normalizedKey.length < 4) return normalizedKey;
+
+  return [...map.keys()].find((key) => (
+    key.length >= 4
+    && Math.abs(key.length - normalizedKey.length) <= 1
+    && getEditDistance(key, normalizedKey) <= 1
+  )) || normalizedKey;
+}
+
+function createEmptyDescriptionItem(key, description) {
+  return {
+    key,
+    description,
+    rowCount: 0,
+    people: 0,
+    cash: 0,
+    card: 0,
+    expense: 0,
+    total: 0,
+    net: 0,
+    ratio: 0,
+    averageTicket: 0,
+    recentTotal: 0,
+    previousRecentTotal: 0,
+    recentDiff: 0,
+    recentRate: null,
+    previousTotal: 0,
+    growthDiff: 0,
+    growthRate: null,
+    variants: [],
+    variantCount: 0,
+    variantMap: new Map()
+  };
+}
+
+function getRecentDescriptionWindow(transactions, days = 7) {
+  const dates = transactions
+    .map((tx) => tx.transaction_date)
+    .filter(Boolean)
+    .sort();
+  const endDate = dates[dates.length - 1] || null;
+  if (!endDate) return null;
+
+  const recentStart = parseDateKey(endDate);
+  recentStart.setDate(recentStart.getDate() - days + 1);
+
+  const previousEnd = new Date(recentStart);
+  previousEnd.setDate(previousEnd.getDate() - 1);
+
+  const previousStart = new Date(previousEnd);
+  previousStart.setDate(previousStart.getDate() - days + 1);
+
+  return {
+    recentStart: formatDateKey(recentStart),
+    recentEnd: endDate,
+    previousStart: formatDateKey(previousStart),
+    previousEnd: formatDateKey(previousEnd)
+  };
+}
+
+function isDateBetween(dateStr, startStr, endStr) {
+  return Boolean(dateStr && startStr && endStr && dateStr >= startStr && dateStr <= endStr);
+}
+
+function aggregateDescriptions(transactions, seedKeys = [], recentWindow = null) {
+  const map = new Map();
+  seedKeys.forEach((key) => {
+    if (!map.has(key)) map.set(key, createEmptyDescriptionItem(key, key));
+  });
+
+  let totalSales = 0;
+
+  transactions.forEach((tx) => {
+    const normalized = normalizeDescription(tx.description);
+    const key = resolveDescriptionKey(map, normalized.key);
+    const cash = toNumber(tx.cash_income);
+    const card = toNumber(tx.card_income);
+    const expense = toNumber(tx.cash_expense);
+    const people = toNumber(tx.customer_count);
+    const sales = cash + card;
+
+    if (!map.has(key)) {
+      map.set(key, createEmptyDescriptionItem(key, normalized.label));
+    }
+
+    const item = map.get(key);
+    const variant = normalized.original;
+
+    item.rowCount += 1;
+    item.people += people;
+    item.cash += cash;
+    item.card += card;
+    item.expense += expense;
+    item.total += sales;
+    item.net += sales - expense;
+    totalSales += sales;
+
+    if (!item.variantMap.has(variant)) {
+      item.variantMap.set(variant, { label: variant, total: 0, rowCount: 0 });
+    }
+    const variantItem = item.variantMap.get(variant);
+    variantItem.total += sales;
+    variantItem.rowCount += 1;
+
+    if (recentWindow && isDateBetween(tx.transaction_date, recentWindow.recentStart, recentWindow.recentEnd)) {
+      item.recentTotal += sales;
+    } else if (recentWindow && isDateBetween(tx.transaction_date, recentWindow.previousStart, recentWindow.previousEnd)) {
+      item.previousRecentTotal += sales;
+    }
+  });
+
+  return { map, totalSales };
+}
+
 export function buildDailySummaryFromView(startStr, endStr, rows) {
   const start = parseDateKey(startStr);
   const end = parseDateKey(endStr);
@@ -175,13 +327,13 @@ export function summarizeWeekdayPerformance(dailySummary, transactions = []) {
     if (sales <= 0) return;
 
     const index = parseDateKey(dateStr).getDay();
-    const description = (tx.description || '미입력').trim() || '미입력';
-    const key = `${index}::${description}`;
+    const normalized = normalizeDescription(tx.description);
+    const key = `${index}::${normalized.key}`;
 
     if (!descriptionMap.has(key)) {
       descriptionMap.set(key, {
         weekdayIndex: index,
-        description,
+        description: normalized.label,
         total: 0,
         people: 0,
         rowCount: 0
@@ -234,55 +386,68 @@ export function summarizeWeekdayPerformance(dailySummary, transactions = []) {
   };
 }
 
-export function summarizeDescriptions(transactions, limit = 5) {
-  const map = new Map();
-  let totalSales = 0;
+export function summarizeDescriptions(transactions, options = {}) {
+  const config = typeof options === 'number' ? { limit: options } : options;
+  const limit = config.limit || 5;
+  const previousTransactions = config.previousTransactions || [];
+  const comparisonLabel = config.comparisonLabel || '이전 기간 대비';
+  const recentWindow = getRecentDescriptionWindow(transactions);
+  const current = aggregateDescriptions(transactions, [], recentWindow);
+  const previous = aggregateDescriptions(previousTransactions, [...current.map.keys()]);
 
-  transactions.forEach((tx) => {
-    const description = (tx.description || '미입력').trim() || '미입력';
-    const cash = toNumber(tx.cash_income);
-    const card = toNumber(tx.card_income);
-    const expense = toNumber(tx.cash_expense);
-    const people = toNumber(tx.customer_count);
-    const sales = cash + card;
-
-    if (!map.has(description)) {
-      map.set(description, {
-        description,
-        rowCount: 0,
-        people: 0,
-        cash: 0,
-        card: 0,
-        expense: 0,
-        total: 0,
-        net: 0,
-        ratio: 0
-      });
+  previous.map.forEach((previousItem, key) => {
+    if (current.map.has(key)) {
+      current.map.get(key).previousTotal = previousItem.total;
     }
-
-    const item = map.get(description);
-    item.rowCount += 1;
-    item.people += people;
-    item.cash += cash;
-    item.card += card;
-    item.expense += expense;
-    item.total += sales;
-    item.net += sales - expense;
-    totalSales += sales;
   });
 
-  const items = [...map.values()]
-    .map((item) => ({
-      ...item,
-      ratio: totalSales > 0 ? (item.total / totalSales) * 100 : 0
-    }))
+  const allItems = [...current.map.values()]
+    .filter((item) => item.rowCount > 0 || item.total > 0)
+    .map((item) => {
+      const variants = [...item.variantMap.values()]
+        .sort((a, b) => b.total - a.total || b.rowCount - a.rowCount)
+        .map((variant) => variant.label);
+      const growthDiff = item.total - item.previousTotal;
+      const recentDiff = item.recentTotal - item.previousRecentTotal;
+      const preferredVariant = variants[0] || item.description;
+
+      return {
+        ...item,
+        description: item.description === item.key ? preferredVariant : item.description,
+        variants,
+        variantCount: variants.length,
+        ratio: current.totalSales > 0 ? (item.total / current.totalSales) * 100 : 0,
+        averageTicket: item.people > 0 ? Math.round(item.total / item.people) : 0,
+        growthDiff,
+        growthRate: item.previousTotal > 0 ? (growthDiff / item.previousTotal) * 100 : null,
+        recentDiff,
+        recentRate: item.previousRecentTotal > 0 ? (recentDiff / item.previousRecentTotal) * 100 : null,
+        variantMap: undefined
+      };
+    });
+
+  const items = allItems
     .sort((a, b) => b.total - a.total || b.people - a.people)
     .slice(0, limit);
 
+  const rising = allItems
+    .filter((item) => item.recentTotal > 0 && (item.recentDiff > 0 || item.previousRecentTotal === 0))
+    .sort((a, b) => b.recentDiff - a.recentDiff || b.recentTotal - a.recentTotal)[0] || null;
+
+  const growth = allItems
+    .filter((item) => item.total > 0 && item.growthDiff > 0)
+    .sort((a, b) => b.growthDiff - a.growthDiff || b.total - a.total)[0] || null;
+
   return {
     items,
+    allItems,
     top: items[0] || null,
-    totalSales
+    rising,
+    growth,
+    groupedCount: allItems.filter((item) => item.variantCount > 1).length,
+    totalSales: current.totalSales,
+    comparisonLabel,
+    recentWindow
   };
 }
 
@@ -532,18 +697,28 @@ export function createInsightMessages(summary, comparison = null, signals = {}) 
     messages.push(`이전 기간 대비 매출이 ${Math.abs(Math.round(comparison.rate)).toLocaleString()}% ${direction}했습니다.`);
   }
 
-  if (signals.weekday?.best) {
-    messages.push(`${signals.weekday.best.name} 평균 매출이 ${signals.weekday.best.average.toLocaleString()}원으로 가장 강합니다.`);
-    if (signals.weekday.best.recentFourAverage > 0) {
-      messages.push(`최근 4회 기준 ${signals.weekday.best.name} 평균은 ${signals.weekday.best.recentFourAverage.toLocaleString()}원입니다.`);
-    }
-    if (signals.weekday.best.topDescription) {
-      messages.push(`${signals.weekday.best.name} TOP 적요는 "${signals.weekday.best.topDescription.description}"이며 ${signals.weekday.best.topDescription.total.toLocaleString()}원입니다.`);
-    }
+  if (signals.descriptions?.top) {
+    messages.push(`적요 기준 매출 1위는 "${signals.descriptions.top.description}"이며 ${signals.descriptions.top.total.toLocaleString()}원, 평균 객단가는 ${signals.descriptions.top.averageTicket.toLocaleString()}원입니다.`);
   }
 
-  if (signals.descriptions?.top) {
-    messages.push(`적요 기준 매출 1위는 "${signals.descriptions.top.description}"이며 ${signals.descriptions.top.total.toLocaleString()}원입니다.`);
+  if (signals.descriptions?.rising) {
+    messages.push(`최근 뜨는 적요는 "${signals.descriptions.rising.description}"입니다. 최근 7일 매출이 ${signals.descriptions.rising.recentTotal.toLocaleString()}원입니다.`);
+  }
+
+  if (signals.descriptions?.growth) {
+    const growth = signals.descriptions.growth;
+    const growthText = growth.previousTotal > 0
+      ? `${Math.abs(Math.round(growth.growthRate)).toLocaleString()}% ${growth.growthDiff >= 0 ? '성장' : '감소'}`
+      : '신규 또는 재등장';
+    messages.push(`${signals.descriptions.comparisonLabel || '이전 기간 대비'} 성장 적요는 "${growth.description}"이며 ${growthText}했습니다.`);
+  }
+
+  if (signals.descriptions?.groupedCount > 0) {
+    messages.push(`비슷하게 입력된 적요 ${signals.descriptions.groupedCount.toLocaleString()}개 그룹을 자동으로 묶어 분석했습니다.`);
+  }
+
+  if (signals.weekday?.best) {
+    messages.push(`${signals.weekday.best.name} 평균 매출이 ${signals.weekday.best.average.toLocaleString()}원으로 가장 강합니다.`);
   }
 
   if (summary.cardRatio >= 65) {
