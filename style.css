@@ -645,6 +645,53 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     box-shadow: var(--shadow-sm);
 }
 
+.chart-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0 8px;
+}
+
+.chart-summary-card {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    padding: 12px;
+    background: var(--insight-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.chart-summary-card span {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+.chart-summary-card strong {
+    min-width: 0;
+    color: var(--text-main);
+    font-size: 1rem;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chart-summary-card small {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.chart-summary-card .is-positive {
+    color: var(--primary);
+}
+
+.chart-summary-card .is-negative {
+    color: var(--danger);
+}
+
 .chart-wrap {
     position: relative;
     width: 100%;
@@ -941,6 +988,9 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     .flow-badges {
         justify-content: flex-start;
     }
+    .chart-summary-strip {
+        grid-template-columns: 1fr 1fr;
+    }
     .flow-highlight-grid {
         grid-template-columns: 1fr 1fr;
     }
@@ -950,6 +1000,7 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
 @media (max-width: 430px) {
     .summary-cards { grid-template-columns: 1fr; }
     .header h1 { font-size: 1.25rem; }
+    .chart-summary-strip { grid-template-columns: 1fr; }
     .flow-highlight-grid { grid-template-columns: 1fr; }
 }
 

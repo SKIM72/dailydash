@@ -265,9 +265,34 @@ export function analyzeSalesFlow(dailySummary) {
   const cardMissingDays = activeRows.filter((day) => day.total > 0 && day.card === 0).length;
   const cashMissingDays = activeRows.filter((day) => day.total > 0 && day.cash === 0).length;
   const expenseHeavyDays = activeRows.filter((day) => day.total > 0 && (day.expense / day.total) >= 0.3);
+  const latestActiveDay = activeRows[activeRows.length - 1];
+  const latestIndex = rows.findIndex((day) => day.date === latestActiveDay.date);
+  const recentSevenRows = rows
+    .slice(Math.max(0, latestIndex - 6), latestIndex + 1)
+    .filter(isOperatingDay);
+  const previousSevenRows = rows
+    .slice(Math.max(0, latestIndex - 13), Math.max(0, latestIndex - 6))
+    .filter(isOperatingDay);
+  const recentSevenAverage = recentSevenRows.length > 0
+    ? Math.round(recentSevenRows.reduce((sum, day) => sum + day.total, 0) / recentSevenRows.length)
+    : 0;
+  const previousSevenAverage = previousSevenRows.length > 0
+    ? Math.round(previousSevenRows.reduce((sum, day) => sum + day.total, 0) / previousSevenRows.length)
+    : 0;
+  const recentAverageDiff = previousSevenAverage > 0 ? recentSevenAverage - previousSevenAverage : null;
+  const recentAverageRate = previousSevenAverage > 0 ? (recentAverageDiff / previousSevenAverage) * 100 : null;
+  const sameWeekdayDay = [...activeRows]
+    .filter((day) => day.date < latestActiveDay.date && parseDateKey(day.date).getDay() === parseDateKey(latestActiveDay.date).getDay())
+    .pop();
+  const sameWeekdayDiff = sameWeekdayDay ? latestActiveDay.total - sameWeekdayDay.total : null;
+  const sameWeekdayRate = sameWeekdayDay?.total > 0 ? (sameWeekdayDiff / sameWeekdayDay.total) * 100 : null;
 
   const badges = [];
   if (concentrationRate >= 60) badges.push({ label: '매출 집중', tone: 'warning' });
+  if (recentAverageRate >= 20) badges.push({ label: '7일 평균 상승', tone: 'success' });
+  if (recentAverageRate <= -20) badges.push({ label: '7일 평균 하락', tone: 'warning' });
+  if (sameWeekdayRate >= 30) badges.push({ label: '동요일 상승', tone: 'success' });
+  if (sameWeekdayRate <= -30) badges.push({ label: '동요일 하락', tone: 'warning' });
   if (biggestDrop?.rate <= -40) badges.push({ label: '급락 확인', tone: 'danger' });
   if (trailingEmptyDays > 0) badges.push({ label: '입력 공백', tone: 'warning' });
   if (expenseHeavyDays.length > 0) badges.push({ label: '지출 비중 높음', tone: 'danger' });
@@ -287,6 +312,15 @@ export function analyzeSalesFlow(dailySummary) {
       meta: `${activeRows.length.toLocaleString()}영업일 기준`
     }
   ];
+
+  if (recentSevenAverage > 0) {
+    highlights.push({
+      label: '7일 평균',
+      value: '최근 흐름',
+      amount: recentSevenAverage,
+      meta: `${recentSevenRows.length.toLocaleString()}영업일 기준`
+    });
+  }
 
   if (biggestRise) {
     highlights.push({
@@ -318,6 +352,25 @@ export function analyzeSalesFlow(dailySummary) {
       tone: 'success',
       title: '매출 분포',
       body: `최고 매출일 비중은 ${Math.round(concentrationRate).toLocaleString()}%입니다. 특정 일자에 과도하게 몰린 흐름은 아닙니다.`
+    });
+  }
+
+  if (recentSevenAverage > 0) {
+    const trendText = recentAverageRate === null
+      ? '이전 7일과 비교할 데이터가 아직 부족합니다.'
+      : `이전 7일 영업평균 대비 ${Math.abs(Math.round(recentAverageRate)).toLocaleString()}% ${recentAverageDiff >= 0 ? '상승' : '하락'}했습니다.`;
+    messages.push({
+      tone: recentAverageDiff === null ? 'neutral' : recentAverageDiff >= 0 ? 'success' : 'warning',
+      title: '7일 평균선',
+      body: `최근 7일 영업평균은 ${recentSevenAverage.toLocaleString()}원입니다. ${trendText}`
+    });
+  }
+
+  if (sameWeekdayDay && sameWeekdayRate !== null) {
+    messages.push({
+      tone: sameWeekdayDiff >= 0 ? 'success' : 'warning',
+      title: '동요일 비교',
+      body: `${latestActiveDay.date.slice(5)} 매출은 직전 같은 요일(${sameWeekdayDay.date.slice(5)}) 대비 ${Math.abs(Math.round(sameWeekdayRate)).toLocaleString()}% ${sameWeekdayDiff >= 0 ? '증가' : '감소'}했습니다. 요일 패턴 변화로 보기 좋습니다.`
     });
   }
 
@@ -380,7 +433,7 @@ export function analyzeSalesFlow(dailySummary) {
 
   return {
     badges,
-    highlights: highlights.slice(0, 4),
+    highlights: highlights.slice(0, 5),
     messages: messages.slice(0, 6)
   };
 }

@@ -234,6 +234,119 @@ document.addEventListener('DOMContentLoaded', () => {
         element.textContent = formatComparisonDetail(comparison);
     }
 
+    function isTrendOperatingDay(day) {
+        return day.count > 0 || day.total > 0 || day.expense > 0;
+    }
+
+    function formatSignedRate(diff, baseValue) {
+        if (!baseValue) return '비교 없음';
+        const rate = Math.round((diff / baseValue) * 100);
+        const sign = diff >= 0 ? '+' : '';
+        return `${sign}${rate.toLocaleString()}%`;
+    }
+
+    function formatSignedAmount(diff) {
+        const sign = diff >= 0 ? '+' : '-';
+        return `${sign}${formatCompactWon(diff)}`;
+    }
+
+    function getTrendTone(diff) {
+        if (diff > 0) return 'is-positive';
+        if (diff < 0) return 'is-negative';
+        return '';
+    }
+
+    function buildMovingAverage(values, windowSize = 7) {
+        return values.map((_, index) => {
+            const windowValues = values.slice(Math.max(0, index - windowSize + 1), index + 1);
+            if (windowValues.length === 0) return 0;
+            const sum = windowValues.reduce((total, value) => total + value, 0);
+            return Math.round(sum / windowValues.length);
+        });
+    }
+
+    function renderTrendSummary(dailySummary) {
+        const container = document.getElementById('trendSummaryStrip');
+        if (!container) return;
+        container.replaceChildren();
+
+        const rows = Object.keys(dailySummary).sort().map((date) => ({
+            date,
+            ...dailySummary[date]
+        }));
+        const activeRows = rows.filter(isTrendOperatingDay);
+
+        if (activeRows.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-compact';
+            empty.textContent = '조회 기간에 차트로 해석할 매출 데이터가 없습니다.';
+            container.appendChild(empty);
+            return;
+        }
+
+        const latest = activeRows[activeRows.length - 1];
+        const previous = activeRows[activeRows.length - 2] || null;
+        const latestIndex = rows.findIndex((row) => row.date === latest.date);
+        const sevenDayRows = rows
+            .slice(Math.max(0, latestIndex - 6), latestIndex + 1)
+            .filter(isTrendOperatingDay);
+        const sevenDayAverage = sevenDayRows.length > 0
+            ? Math.round(sevenDayRows.reduce((sum, row) => sum + row.total, 0) / sevenDayRows.length)
+            : 0;
+        const maxDay = [...activeRows].sort((a, b) => b.total - a.total)[0];
+        const sameWeekday = [...activeRows]
+            .filter((row) => row.date < latest.date && parseDateKey(row.date).getDay() === parseDateKey(latest.date).getDay())
+            .pop();
+        const previousDiff = previous ? latest.total - previous.total : 0;
+        const sameWeekdayDiff = sameWeekday ? latest.total - sameWeekday.total : 0;
+        const averageDiff = sevenDayAverage > 0 ? latest.total - sevenDayAverage : 0;
+
+        const cards = [
+            {
+                label: '최근 영업일',
+                value: `${latest.date.slice(5)} · ${formatCompactWon(latest.total)}`,
+                meta: previous ? `전 영업일 ${formatSignedRate(previousDiff, previous.total)} · ${formatSignedAmount(previousDiff)}` : '전 영업일 비교 없음',
+                tone: getTrendTone(previousDiff)
+            },
+            {
+                label: '7일 영업평균',
+                value: formatCompactWon(sevenDayAverage),
+                meta: `${sevenDayRows.length.toLocaleString()}영업일 기준 · 최근일 ${formatSignedRate(averageDiff, sevenDayAverage)}`,
+                tone: ''
+            },
+            {
+                label: '최고 매출일',
+                value: `${maxDay.date.slice(5)} · ${formatCompactWon(maxDay.total)}`,
+                meta: maxDay.date === latest.date ? '최근 영업일이 최고점' : `${latest.date.slice(5)} 기준 ${formatSignedAmount(latest.total - maxDay.total)}`,
+                tone: maxDay.date === latest.date ? 'is-positive' : ''
+            },
+            {
+                label: '동요일 비교',
+                value: sameWeekday ? formatSignedRate(sameWeekdayDiff, sameWeekday.total) : '비교 없음',
+                meta: sameWeekday ? `${sameWeekday.date.slice(5)} 대비 ${formatSignedAmount(sameWeekdayDiff)}` : '직전 같은 요일 데이터 부족',
+                tone: getTrendTone(sameWeekdayDiff)
+            }
+        ];
+
+        cards.forEach((card) => {
+            const item = document.createElement('div');
+            item.className = 'chart-summary-card';
+
+            const label = document.createElement('span');
+            label.textContent = card.label;
+
+            const value = document.createElement('strong');
+            value.textContent = card.value;
+            if (card.tone) value.classList.add(card.tone);
+
+            const meta = document.createElement('small');
+            meta.textContent = card.meta;
+
+            item.append(label, value, meta);
+            container.appendChild(item);
+        });
+    }
+
     function renderWeekdaySignals(containerId, weekdaySummary) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -805,6 +918,8 @@ document.addEventListener('DOMContentLoaded', () => {
             totalSalesAccum += data.total;
         });
 
+        renderTrendSummary(dailySummary);
+
         // 1) 복합 다차원 추이 그래프 시각화 빌드 (Chart.js 제어)
         const ctx = document.getElementById('totalTrendChart');
         if (ctx) {
@@ -812,8 +927,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 trendChartInstance.destroy(); // 기존 차트 자원 반환 및 초기화
             }
 
+            const positiveSalesValues = totalData.filter(value => value > 0);
+            const maxSalesValue = positiveSalesValues.length ? Math.max(...positiveSalesValues) : 0;
+            const minSalesValue = positiveSalesValues.length ? Math.min(...positiveSalesValues) : 0;
+            const totalBarBackground = totalData.map((value) => {
+                if (value > 0 && value === maxSalesValue) return '#2563eb';
+                if (maxSalesValue !== minSalesValue && value > 0 && value === minSalesValue) return '#93c5fd';
+                return '#3182f6';
+            });
+            const totalBarBorder = totalData.map((value) => {
+                if (value > 0 && value === maxSalesValue) return '#1d4ed8';
+                if (maxSalesValue !== minSalesValue && value > 0 && value === minSalesValue) return '#60a5fa';
+                return '#3182f6';
+            });
+            const movingAverageData = buildMovingAverage(totalData, 7);
+
             const chartModeCaption = {
-                sales: '총매출과 지출 흐름을 중심으로 봅니다.',
+                sales: '총매출, 7일 평균, 지출 흐름을 함께 봅니다.',
                 payment: '현금과 카드 매출 비중을 누적 막대로 봅니다.',
                 people: '방문 인원과 객단가가 매출에 미치는 흐름을 봅니다.'
             };
@@ -825,12 +955,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         {
                             label: '총매출',
                             data: totalData,
-                            backgroundColor: '#3182f6',
-                            borderColor: '#3182f6',
+                            backgroundColor: totalBarBackground,
+                            borderColor: totalBarBorder,
                             borderWidth: 1,
                             borderRadius: 6,
                             maxBarThickness: 44,
                             order: 2
+                        },
+                        {
+                            label: '7일 평균',
+                            data: movingAverageData,
+                            type: 'line',
+                            borderColor: '#0f766e',
+                            backgroundColor: '#0f766e',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            tension: 0.35,
+                            order: 1,
+                            fill: false
                         },
                         {
                             label: '현금 지출',
@@ -899,8 +1042,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         {
                             label: '총매출',
                             data: totalData,
-                            backgroundColor: '#3182f6',
-                            borderColor: '#3182f6',
+                            backgroundColor: totalBarBackground,
+                            borderColor: totalBarBorder,
                             borderRadius: 6,
                             maxBarThickness: 42,
                             order: 2

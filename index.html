@@ -309,13 +309,16 @@
                             <div class="section-header chart-section-header">
                                 <div>
                                     <h2><i class="fas fa-chart-bar"></i> 매출 추이</h2>
-                                    <p id="trendChartCaption" class="chart-caption">총매출과 지출 흐름을 중심으로 봅니다.</p>
+                                    <p id="trendChartCaption" class="chart-caption">총매출, 7일 평균, 지출 흐름을 함께 봅니다.</p>
                                 </div>
                                 <div class="chart-mode-control" role="radiogroup" aria-label="차트 보기 방식">
                                     <button type="button" class="chart-mode-btn active" role="radio" aria-checked="true" data-chart-mode="sales">매출 중심</button>
                                     <button type="button" class="chart-mode-btn" role="radio" aria-checked="false" data-chart-mode="payment">결제수단</button>
                                     <button type="button" class="chart-mode-btn" role="radio" aria-checked="false" data-chart-mode="people">방문객</button>
                                 </div>
+                            </div>
+                            <div id="trendSummaryStrip" class="chart-summary-strip">
+                                <div class="empty-compact">기간을 조회하면 차트 핵심 지표를 요약합니다.</div>
                             </div>
                             <div class="chart-wrap">
                                 <canvas id="totalTrendChart"></canvas>
