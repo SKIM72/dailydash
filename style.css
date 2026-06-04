@@ -337,6 +337,111 @@ body {
     font-weight: 700;
 }
 
+.operation-history-panel {
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    background: var(--side-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.operation-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.operation-history-header strong {
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-weight: 900;
+}
+
+.operation-history-header strong i {
+    color: var(--primary);
+    margin-right: 6px;
+}
+
+.operation-history-header button {
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--main-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.operation-history-header button:hover {
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.operation-history-list {
+    display: grid;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.operation-history-empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 14px 0;
+}
+
+.operation-history-item {
+    padding: 10px 12px;
+    background: var(--main-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.operation-history-item-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.operation-history-item strong {
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-weight: 900;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.operation-history-item-head span {
+    flex-shrink: 0;
+    color: var(--primary);
+    background: rgba(47, 128, 237, 0.1);
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+.operation-history-item small,
+.operation-history-item p {
+    display: block;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
 button { border: none; font-family: var(--font-family); }
 .btn-submit { background: var(--primary); color: white; border-radius: 10px; padding: 14px; font-size: 1.05rem; font-weight: 700; width: 100%; margin-top: 10px; cursor: pointer; transition: 0.2s; }
 .btn-submit:hover { background: var(--primary-hover); }
@@ -344,6 +449,20 @@ button { border: none; font-family: var(--font-family); }
 .btn-secondary:hover { background: var(--border); }
 .btn-danger { background: var(--danger); color: white; border-radius: 6px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
 .btn-danger:hover { background: var(--danger-hover); }
+
+.sensitive-locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--side-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-weight: 900;
+}
 
 .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; background: var(--main-bg); }
 table { width: 100%; border-collapse: collapse; min-width: 960px; }
@@ -903,6 +1022,20 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
 
 .btn-excel:hover {
     background: #16a34a;
+}
+
+.btn-excel.is-locked,
+.btn-excel:disabled {
+    cursor: not-allowed;
+    background: var(--side-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    box-shadow: none;
+}
+
+.btn-excel.is-locked:hover,
+.btn-excel:disabled:hover {
+    background: var(--side-bg);
 }
 
 .analytics-dashboard-grid {

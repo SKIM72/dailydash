@@ -14,7 +14,7 @@ import {
     summarizeWeekdayPerformance
 } from './features/analytics.js';
 import { installThemeControls } from './shared/theme.js';
-import { renderVersionLabels } from './shared/version.js';
+import { APP_VERSION_LABEL, renderVersionLabels } from './shared/version.js';
 
 installModalHandlers();
 installThemeControls();
@@ -76,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const loggedInEmail = document.getElementById('loggedInEmail');
     const superUserPanel = document.getElementById('superUserPanel');
     const approvalListBody = document.getElementById('approvalListBody');
+    const operationHistoryList = document.getElementById('operationHistoryList');
+    const clearOperationHistoryBtn = document.getElementById('clearOperationHistoryBtn');
 
     const downloadExcelBtn = document.getElementById('downloadExcelBtn');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -84,8 +86,138 @@ document.addEventListener('DOMContentLoaded', () => {
     let trendChartInstance = null;
     let currentChartMode = 'sales';
     let lastTrendDailySummary = null;
+    let currentUserEmail = '';
+
+    const SUPER_ADMIN_EMAIL = 'eowert72@gmail.com';
+    const OPERATION_HISTORY_KEY = 'dailydash-operation-history';
 
     if (!datePicker || !tabDaily || !tableBody) return;
+
+    function normalizeEmail(email) {
+        return String(email || '').trim().toLowerCase();
+    }
+
+    function isSuperAdmin() {
+        return normalizeEmail(currentUserEmail) === SUPER_ADMIN_EMAIL;
+    }
+
+    function formatKstDateTime(value = new Date()) {
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            year: '2-digit',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    }
+
+    function getBackupTimestamp(value = new Date()) {
+        const kst = new Date(value.getTime() + 9 * 60 * 60 * 1000);
+        return kst.toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    }
+
+    function sanitizeFilePart(value) {
+        return String(value || 'backup').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_');
+    }
+
+    function getOperationHistory() {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(OPERATION_HISTORY_KEY) || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function saveOperationHistory(items) {
+        try {
+            localStorage.setItem(OPERATION_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
+        } catch {
+            // 저장 공간이 막힌 환경에서는 이력 표시만 생략한다.
+        }
+    }
+
+    function renderOperationHistory() {
+        if (!operationHistoryList) return;
+        const items = getOperationHistory();
+        operationHistoryList.replaceChildren();
+
+        if (!items.length) {
+            const empty = document.createElement('p');
+            empty.className = 'operation-history-empty';
+            empty.textContent = '아직 기록된 작업이 없습니다.';
+            operationHistoryList.appendChild(empty);
+            return;
+        }
+
+        items.forEach((item) => {
+            const entry = document.createElement('article');
+            entry.className = 'operation-history-item';
+
+            const head = document.createElement('div');
+            head.className = 'operation-history-item-head';
+
+            const label = document.createElement('strong');
+            label.textContent = item.label || item.type || '작업';
+            const type = document.createElement('span');
+            type.textContent = item.type || '작업';
+            head.append(label, type);
+
+            const meta = document.createElement('small');
+            meta.textContent = `${formatKstDateTime(item.at)} · ${item.user || '계정 정보 없음'}`;
+
+            entry.append(head, meta);
+            if (Array.isArray(item.details) && item.details.length) {
+                const detail = document.createElement('p');
+                detail.textContent = item.details.filter(Boolean).join(' · ');
+                entry.appendChild(detail);
+            }
+            operationHistoryList.appendChild(entry);
+        });
+    }
+
+    function logOperation(type, label, details = []) {
+        const items = getOperationHistory();
+        items.unshift({
+            at: new Date().toISOString(),
+            user: currentUserEmail || 'unknown',
+            type,
+            label,
+            details
+        });
+        saveOperationHistory(items);
+        renderOperationHistory();
+    }
+
+    function applySensitiveActionGuard() {
+        const locked = !isSuperAdmin();
+        [downloadExcelBtn, downloadTotalExcelBtn].forEach((button) => {
+            if (!button) return;
+            button.disabled = locked;
+            button.classList.toggle('is-locked', locked);
+            button.title = locked ? '관리자만 엑셀 백업을 실행할 수 있습니다.' : '엑셀 백업 다운로드';
+        });
+    }
+
+    function buildTransactionSummary(tx) {
+        const people = getTransactionAmount(tx, 'customer_count');
+        const cash = getTransactionAmount(tx, 'cash_income');
+        const card = getTransactionAmount(tx, 'card_income');
+        const expense = getTransactionAmount(tx, 'cash_expense');
+        const sales = cash + card;
+        return {
+            people,
+            cash,
+            card,
+            expense,
+            sales,
+            label: `${tx.transaction_date || datePicker.value} · ${tx.description || '적요 없음'}`
+        };
+    }
 
     ['count', 'cashIn', 'cardIn', 'cashOut'].forEach(id => {
         const el = document.getElementById(id);
@@ -661,6 +793,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return; 
+        currentUserEmail = session.user.email || '';
+        applySensitiveActionGuard();
 
         // 운영 데이터 보호: 프론트엔드에서는 삭제 보관분을 물리 삭제하지 않는다.
         // 장기 보관/정리는 Supabase 백업 확인 후 서버 작업이나 스케줄러에서 별도로 처리한다.
@@ -699,12 +833,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (downloadExcelBtn) downloadExcelBtn.addEventListener('click', () => downloadStyledExcel('monthlyTable', monthPicker.value));
         if (downloadTotalExcelBtn) downloadTotalExcelBtn.addEventListener('click', () => downloadStyledExcel('totalRangeTable', `${totalStartDate.value}_to_${totalEndDate.value}`));
         if (logoutBtn) logoutBtn.addEventListener('click', () => window.logout());
+        if (clearOperationHistoryBtn) {
+            clearOperationHistoryBtn.addEventListener('click', async () => {
+                if (!(await window.showConfirm('이 브라우저에 저장된 작업 이력을 비울까요?'))) return;
+                saveOperationHistory([]);
+                renderOperationHistory();
+            });
+        }
 
         if (myPageBtn && myPageModal && closeMyPage) {
             myPageBtn.addEventListener('click', () => {
-                loggedInEmail.textContent = session.user.email;
+                loggedInEmail.textContent = currentUserEmail;
+                renderOperationHistory();
                 myPageModal.classList.remove('hidden-view');
-                if (session.user.email === 'eowert72@gmail.com') {
+                if (isSuperAdmin()) {
                     superUserPanel.classList.remove('hidden-view');
                     loadApprovalList();
                 } else {
@@ -727,6 +869,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadApprovalList() {
         if (!approvalListBody) return;
+        if (!isSuperAdmin()) {
+            approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg" style="padding: 20px !important;">관리자 전용 영역입니다.</td></tr>';
+            return;
+        }
         approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 대기 명단 구성 중...</td></tr>';
         const { data: list, error } = await supabase.from('user_approvals').select('*').eq('is_approved', false).order('created_at', { ascending: true });
         if (error) {
@@ -752,10 +898,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.approveUser = async (targetEmail) => {
-        if (!(await window.showConfirm(`${targetEmail} 계정의 DailyDash 접속 권한을 승인하시겠습니까?`))) return;
+        if (!isSuperAdmin()) {
+            await window.showAlert('회원 승인 처리는 관리자만 가능합니다.');
+            return;
+        }
+        const confirmMessage = [
+            '회원가입 승인을 진행할까요?',
+            `대상 계정: ${targetEmail}`,
+            '승인 후 DailyDash 정산 장부에 접속할 수 있습니다.'
+        ].join('\n');
+        if (!(await window.showConfirm(confirmMessage))) return;
         const { error } = await supabase.from('user_approvals').update({ is_approved: true }).eq('email', targetEmail);
         if (error) { await window.showAlert("승인 처리 중 오류 발생: " + error.message); } 
-        else { await window.showAlert(`${targetEmail} 계정의 정산 장부 접근 승인이 완료되었습니다.`); loadApprovalList(); }
+        else {
+            logOperation('회원 승인', targetEmail, ['DailyDash 접속 권한 승인']);
+            await window.showAlert(`${targetEmail} 계정의 정산 장부 접근 승인이 완료되었습니다.`);
+            loadApprovalList();
+        }
     };
 
     async function loadDailyData(date) {
@@ -801,11 +960,18 @@ document.addEventListener('DOMContentLoaded', () => {
             appendCell(row, tx.remark1 || '', 'color: var(--text-muted);');
             appendCell(row, tx.remark2 || '', 'color: var(--text-muted);');
             const actionCell = appendCell(row, '');
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn-danger';
-            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> 삭제';
-            deleteBtn.addEventListener('click', () => window.deleteTransaction(tx.id));
-            actionCell.appendChild(deleteBtn);
+            if (isSuperAdmin()) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-danger';
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> 삭제';
+                deleteBtn.addEventListener('click', () => window.deleteTransaction(tx));
+                actionCell.appendChild(deleteBtn);
+            } else {
+                const locked = document.createElement('span');
+                locked.className = 'sensitive-locked';
+                locked.innerHTML = '<i class="fas fa-lock"></i> 관리자 전용';
+                actionCell.appendChild(locked);
+            }
             tableBody.appendChild(row);
         });
         updateDailyTotals(tCount, tCashIn, tCashOut, tCardIn);
@@ -945,14 +1111,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const originalButtonHtml = submitTransactionBtn?.innerHTML;
         const newTx = {
             transaction_date: date,
-            description: document.getElementById('desc').value,
+            description: document.getElementById('desc').value.trim(),
             customer_count: parseCommas(document.getElementById('count').value),
             cash_income: parseCommas(document.getElementById('cashIn').value),
             cash_expense: parseCommas(document.getElementById('cashOut').value),
             card_income: parseCommas(document.getElementById('cardIn').value),
-            remark1: document.getElementById('remark1').value,
-            remark2: document.getElementById('remark2').value
+            remark1: document.getElementById('remark1').value.trim(),
+            remark2: document.getElementById('remark2').value.trim()
         };
+        const summary = buildTransactionSummary(newTx);
+        const confirmMessage = [
+            '입력 내용을 저장할까요?',
+            `일자: ${newTx.transaction_date}`,
+            `적요: ${newTx.description || '미입력'}`,
+            `인원: ${summary.people.toLocaleString()}명`,
+            `총매출: ${formatWon(summary.sales)} (현금 ${formatWon(summary.cash)} / 카드 ${formatWon(summary.card)})`,
+            `현금 지출: ${formatWon(summary.expense)}`,
+            `비고: ${[newTx.remark1, newTx.remark2].filter(Boolean).join(' / ') || '없음'}`
+        ].join('\n');
+
+        if (!(await window.showConfirm(confirmMessage))) return;
 
         if (submitTransactionBtn) {
             submitTransactionBtn.disabled = true;
@@ -967,6 +1145,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ['count','cashIn','cardIn','cashOut'].forEach(id => document.getElementById(id).value = '');
             updateEntryPreview();
             await loadDailyData(date);
+            logOperation('내역 입력', summary.label, [
+                `총매출 ${formatWon(summary.sales)}`,
+                `인원 ${summary.people.toLocaleString()}명`
+            ]);
             await window.showAlert("입력이 완료되었습니다.");
             document.getElementById('desc')?.focus();
         } catch (error) {
@@ -979,16 +1161,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    window.deleteTransaction = async (id) => {
-        if(!(await window.showConfirm("이 내역을 삭제하시겠습니까?"))) return;
-        const { error } = await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-        if(!error) { loadDailyData(datePicker.value); } 
+    window.deleteTransaction = async (target) => {
+        if (!isSuperAdmin()) {
+            await window.showAlert('내역 삭제는 관리자만 가능합니다.');
+            return;
+        }
+
+        const tx = typeof target === 'object' && target ? target : { id: target, transaction_date: datePicker.value };
+        const summary = buildTransactionSummary(tx);
+        const confirmMessage = [
+            '이 내역을 삭제 처리할까요?',
+            `일자: ${tx.transaction_date || datePicker.value}`,
+            `적요: ${tx.description || '적요 없음'}`,
+            `인원: ${summary.people.toLocaleString()}명`,
+            `총매출: ${formatWon(summary.sales)}`,
+            `현금 지출: ${formatWon(summary.expense)}`,
+            '삭제된 내역은 화면에서 숨겨지고 deleted_at 값으로 보관됩니다.'
+        ].join('\n');
+
+        if (!(await window.showConfirm(confirmMessage))) return;
+        const { error } = await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).eq('id', tx.id);
+        if(!error) {
+            logOperation('내역 삭제', summary.label, [
+                `총매출 ${formatWon(summary.sales)}`,
+                `인원 ${summary.people.toLocaleString()}명`
+            ]);
+            await loadDailyData(datePicker.value);
+            await window.showAlert('삭제 처리되었습니다.');
+        }
         else { await window.showAlert("삭제 실패: " + error.message); }
     };
 
     saveNoteBtn.addEventListener('click', async () => {
+        const note = noteInput.value.trim();
+        const confirmMessage = [
+            '특기사항을 저장할까요?',
+            `일자: ${datePicker.value}`,
+            `내용 길이: ${note.length.toLocaleString()}자`
+        ].join('\n');
+        if (!(await window.showConfirm(confirmMessage))) return;
         const { error } = await supabase.from('daily_notes').upsert({ note_date: datePicker.value, special_note: noteInput.value });
-        if(!error) await window.showAlert("특기사항이 저장되었습니다.");
+        if(!error) {
+            logOperation('특기사항 저장', datePicker.value, [`${note.length.toLocaleString()}자`]);
+            await window.showAlert("특기사항이 저장되었습니다.");
+        }
         else await window.showAlert("저장 실패: " + error.message);
     });
 
@@ -1505,6 +1721,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 서식(스타일) 세팅 및 엑셀 빌드 핵심 핸들러
     function downloadStyledExcel(tableId, labelStr) {
+        if (!isSuperAdmin()) {
+            window.showAlert('엑셀 백업은 관리자만 실행할 수 있습니다.');
+            return;
+        }
+
         if (typeof XLSX === 'undefined') {
             window.showAlert('엑셀 다운로드를 위한 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 해주세요.');
             return;
@@ -1515,12 +1736,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const wsData = [];
         const columnCount = table.querySelector('thead tr')?.cells.length || 8;
-        
+        const rows = table.querySelectorAll('tr');
+        const exportedRowCount = Math.max(rows.length - 1, 0);
+
         wsData.push(['DailyDash 매출보고서']);
         wsData.push([`조회 대상/기간: ${labelStr}`]);
+        wsData.push([`백업 생성: ${formatKstDateTime()} · ${APP_VERSION_LABEL}`]);
+        wsData.push([`생성 계정: ${currentUserEmail || '계정 정보 없음'}`]);
+        wsData.push([`원본 화면: ${tableId} · 내보낸 행: ${exportedRowCount.toLocaleString()}건`]);
         wsData.push([]); 
 
-        const rows = table.querySelectorAll('tr');
+        const tableHeaderRowIndex = wsData.length;
         rows.forEach(row => {
             const rowData = [];
             const cells = row.querySelectorAll('th, td');
@@ -1534,7 +1760,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ws['!merges'] = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: columnCount - 1 } },
-            { s: { r: 1, c: 0 }, e: { r: 1, c: columnCount - 1 } }
+            { s: { r: 1, c: 0 }, e: { r: 1, c: columnCount - 1 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: columnCount - 1 } },
+            { s: { r: 3, c: 0 }, e: { r: 3, c: columnCount - 1 } },
+            { s: { r: 4, c: 0 }, e: { r: 4, c: columnCount - 1 } }
         ];
 
         for (let cellRef in ws) {
@@ -1559,13 +1788,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 cell.s.font = { name: 'Malgun Gothic', size: 22, bold: true, color: { rgb: '1E293B' } };
                 cell.s.alignment = { horizontal: 'center', vertical: 'center' };
                 delete cell.s.border;
-            } else if (row === 1) {
+            } else if (row > 0 && row < tableHeaderRowIndex) {
                 cell.s.font = { name: 'Malgun Gothic', size: 11, color: { rgb: '64748B' } };
                 cell.s.alignment = { horizontal: 'right', vertical: 'center' };
                 delete cell.s.border;
-            } else if (row === 2) {
-                delete cell.s.border;
-            } else if (row === 3) {
+            } else if (row === tableHeaderRowIndex) {
                 cell.s.font = { name: 'Malgun Gothic', size: 11, bold: true, color: { rgb: 'FFFFFF' } };
                 cell.s.fill = { fgColor: { rgb: '6366F1' } }; 
                 cell.s.alignment = { horizontal: 'center', vertical: 'center' };
@@ -1596,6 +1823,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ws['!rows'] = [
             { hpt: 36 }, 
             { hpt: 22 }, 
+            { hpt: 20 },
+            { hpt: 20 },
+            { hpt: 20 },
             { hpt: 12 }, 
             { hpt: 26 }  
         ];
@@ -1604,7 +1834,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "매출보고서");
-        XLSX.writeFile(wb, `DailyDash_매출보고서_${labelStr}.xlsx`);
+        XLSX.writeFile(wb, `DailyDash_매출보고서_${sanitizeFilePart(labelStr)}_${getBackupTimestamp()}.xlsx`);
+        logOperation('엑셀 백업', labelStr, [
+            `${tableId}`,
+            `${exportedRowCount.toLocaleString()}건`,
+            APP_VERSION_LABEL
+        ]);
     }
 
     init();

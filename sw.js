@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v28-vite-pages';
+const CACHE_NAME = 'dailydash-v29-ops-safety';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
