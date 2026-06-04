@@ -306,7 +306,17 @@
                 <div class="fold-body">
                     <div class="analytics-dashboard-grid">
                         <section class="dashboard-section inner-analysis-section">
-                            <div class="section-header"><h2><i class="fas fa-chart-bar"></i> 매출 추이</h2></div>
+                            <div class="section-header chart-section-header">
+                                <div>
+                                    <h2><i class="fas fa-chart-bar"></i> 매출 추이</h2>
+                                    <p id="trendChartCaption" class="chart-caption">총매출과 순매출 중심으로 흐름을 봅니다.</p>
+                                </div>
+                                <div class="chart-mode-control" role="radiogroup" aria-label="차트 보기 방식">
+                                    <button type="button" class="chart-mode-btn active" role="radio" aria-checked="true" data-chart-mode="sales">매출 중심</button>
+                                    <button type="button" class="chart-mode-btn" role="radio" aria-checked="false" data-chart-mode="payment">결제수단</button>
+                                    <button type="button" class="chart-mode-btn" role="radio" aria-checked="false" data-chart-mode="people">방문객</button>
+                                </div>
+                            </div>
                             <div class="chart-wrap">
                                 <canvas id="totalTrendChart"></canvas>
                             </div>

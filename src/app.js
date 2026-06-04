@@ -80,6 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 전역 차트 인스턴스 핸들 객체 (중복 생성 방지용)
     let trendChartInstance = null;
+    let currentChartMode = 'sales';
+    let lastTrendDailySummary = null;
 
     if (!datePicker || !tabDaily || !tableBody) return;
 
@@ -107,6 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateEntryPreview();
             input.focus();
+        });
+    });
+
+    document.querySelectorAll('[data-chart-mode]').forEach((button) => {
+        button.addEventListener('click', () => {
+            currentChartMode = button.dataset.chartMode || 'sales';
+            updateChartModeButtons();
+            if (lastTrendDailySummary) renderAdvancedAnalytics(lastTrendDailySummary);
         });
     });
 
@@ -144,6 +154,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('entryCashPreview', formatWon(netCash));
         setText('entryTicketPreview', formatWon(averageTicket));
         document.getElementById('entryCashPreview')?.classList.toggle('is-negative', netCash < 0);
+    }
+
+    function updateChartModeButtons() {
+        document.querySelectorAll('[data-chart-mode]').forEach((button) => {
+            const isActive = button.dataset.chartMode === currentChartMode;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-checked', String(isActive));
+        });
     }
 
     async function fetchDailySalesSummary(startStr, endStr) {
@@ -752,6 +770,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 요구사항 2번: 트렌디한 통계 분석 처리를 위한 종합 시각화 및 요일 분석 엔진 탑재
     function renderAdvancedAnalytics(dailySummary) {
+        lastTrendDailySummary = dailySummary;
+        updateChartModeButtons();
+
         const sortedDates = Object.keys(dailySummary).sort();
         const labels = sortedDates.map(d => d.substring(5)); // 'MM-DD' 포맷팅
         
@@ -759,6 +780,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const cardData = [];
         const expenseData = [];
         const customerData = [];
+        const totalData = [];
+        const netData = [];
+        const averageTicketData = [];
         
         // 요일별 누적 집계 데이터 공간 구성 (0: 일요일 ~ 6: 토요일)
         const weekdaySales = [0, 0, 0, 0, 0, 0, 0];
@@ -772,6 +796,9 @@ document.addEventListener('DOMContentLoaded', () => {
             cardData.push(data.card);
             expenseData.push(data.expense || 0);
             customerData.push(data.count);
+            totalData.push(data.total);
+            netData.push(data.net);
+            averageTicketData.push(data.count > 0 ? Math.round(data.total / data.count) : 0);
             
             // 요일 정보 추출하여 가산
             const dayIndex = parseDateKey(d).getDay();
@@ -786,23 +813,36 @@ document.addEventListener('DOMContentLoaded', () => {
             if (trendChartInstance) {
                 trendChartInstance.destroy(); // 기존 차트 자원 반환 및 초기화
             }
-            
-            trendChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
+
+            const chartModeCaption = {
+                sales: '총매출, 순매출, 지출을 한눈에 비교합니다.',
+                payment: '현금과 카드 매출 비중을 누적 막대로 봅니다.',
+                people: '방문 인원과 객단가가 매출에 미치는 흐름을 봅니다.'
+            };
+            setText('trendChartCaption', chartModeCaption[currentChartMode] || chartModeCaption.sales);
+
+            const chartConfigByMode = {
+                sales: {
                     datasets: [
                         {
-                            label: '현금 수입',
-                            data: cashData,
-                            backgroundColor: '#10b981',
-                            stack: 'combinedSales'
+                            label: '총매출',
+                            data: totalData,
+                            backgroundColor: '#3182f6',
+                            borderColor: '#3182f6',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            maxBarThickness: 44
                         },
                         {
-                            label: '카드 수입',
-                            data: cardData,
-                            backgroundColor: '#f59e0b',
-                            stack: 'combinedSales'
+                            label: '순매출',
+                            data: netData,
+                            type: 'line',
+                            borderColor: '#16a34a',
+                            backgroundColor: '#16a34a',
+                            borderWidth: 3,
+                            pointRadius: 3,
+                            tension: 0.3,
+                            fill: false
                         },
                         {
                             label: '현금 지출',
@@ -814,31 +854,107 @@ document.addEventListener('DOMContentLoaded', () => {
                             borderWidth: 2,
                             pointRadius: 2,
                             fill: false
+                        }
+                    ],
+                    stacked: false,
+                    yTitle: '금액 (원)',
+                    peopleAxis: false
+                },
+                payment: {
+                    datasets: [
+                        {
+                            label: '현금 수입',
+                            data: cashData,
+                            backgroundColor: '#10b981',
+                            stack: 'combinedSales',
+                            borderRadius: 5,
+                            maxBarThickness: 42
+                        },
+                        {
+                            label: '카드 수입',
+                            data: cardData,
+                            backgroundColor: '#f59e0b',
+                            stack: 'combinedSales',
+                            borderRadius: 5,
+                            maxBarThickness: 42
+                        },
+                        {
+                            label: '현금 지출',
+                            data: expenseData,
+                            type: 'line',
+                            borderColor: '#ef4444',
+                            backgroundColor: '#ef4444',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            fill: false
+                        }
+                    ],
+                    stacked: true,
+                    yTitle: '금액 (원)',
+                    peopleAxis: false
+                },
+                people: {
+                    datasets: [
+                        {
+                            label: '총매출',
+                            data: totalData,
+                            backgroundColor: '#3182f6',
+                            borderColor: '#3182f6',
+                            borderRadius: 6,
+                            maxBarThickness: 42
+                        },
+                        {
+                            label: '객단가',
+                            data: averageTicketData,
+                            type: 'line',
+                            borderColor: '#8b5cf6',
+                            backgroundColor: '#8b5cf6',
+                            borderWidth: 3,
+                            pointRadius: 3,
+                            tension: 0.3,
+                            fill: false
                         },
                         {
                             label: '방문 인원 (명)',
                             data: customerData,
                             type: 'line',
                             borderColor: '#6366f1',
+                            backgroundColor: '#6366f1',
                             borderWidth: 3,
-                            pointBackgroundColor: '#4f46e5',
+                            pointRadius: 3,
+                            tension: 0.3,
                             fill: false,
                             yAxisID: 'yPeopleAxis'
                         }
-                    ]
+                    ],
+                    stacked: false,
+                    yTitle: '금액 (원)',
+                    peopleAxis: true
+                }
+            };
+
+            const chartConfig = chartConfigByMode[currentChartMode] || chartConfigByMode.sales;
+            
+            trendChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: chartConfig.datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        x: { stacked: true, grid: { display: false } },
+                        x: { stacked: chartConfig.stacked, grid: { display: false } },
                         y: {
-                            stacked: true,
+                            stacked: chartConfig.stacked,
                             position: 'left',
-                            title: { display: true, text: '매출액 (원)', font: { weight: 'bold' } },
+                            title: { display: true, text: chartConfig.yTitle, font: { weight: 'bold' } },
                             ticks: { callback: value => value.toLocaleString() }
                         },
                         yPeopleAxis: {
+                            display: chartConfig.peopleAxis,
                             position: 'right',
                             title: { display: true, text: '방문객 수 (명)', font: { weight: 'bold' } },
                             grid: { display: false },
