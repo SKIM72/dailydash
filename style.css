@@ -615,6 +615,173 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
     min-height: 270px;
 }
 
+.chart-flow-panel {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+    padding: 20px;
+    background: var(--insight-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.flow-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.flow-panel-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    color: var(--text-main);
+    font-size: 1.02rem;
+    font-weight: 900;
+}
+
+.flow-panel-header h2 i {
+    color: var(--primary);
+}
+
+.flow-panel-header p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.flow-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.flow-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    border: 1px solid var(--border);
+    background: var(--main-bg);
+    color: var(--text-muted);
+}
+
+.flow-badge.flow-success {
+    background: color-mix(in srgb, var(--secondary) 14%, var(--main-bg));
+    color: var(--secondary);
+    border-color: color-mix(in srgb, var(--secondary) 34%, var(--border));
+}
+
+.flow-badge.flow-warning {
+    background: color-mix(in srgb, #f59e0b 14%, var(--main-bg));
+    color: #b45309;
+    border-color: color-mix(in srgb, #f59e0b 34%, var(--border));
+}
+
+.flow-badge.flow-danger {
+    background: color-mix(in srgb, var(--danger) 14%, var(--main-bg));
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+}
+
+.flow-highlight-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.flow-highlight-card {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    padding: 13px;
+    background: var(--main-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.flow-highlight-card span {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 900;
+}
+
+.flow-highlight-card strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-main);
+    font-size: 0.96rem;
+    font-weight: 900;
+}
+
+.flow-highlight-card b {
+    color: var(--primary);
+    font-size: 1.05rem;
+    font-weight: 900;
+}
+
+.flow-highlight-card b.is-negative {
+    color: var(--danger);
+}
+
+.flow-highlight-card small {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.flow-message-list {
+    display: grid;
+    gap: 10px;
+}
+
+.flow-message {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 13px 14px 13px 16px;
+    background: var(--main-bg);
+    border: 1px solid var(--soft-border);
+    border-radius: 8px;
+}
+
+.flow-message::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    border-radius: 999px;
+    background: var(--text-muted);
+}
+
+.flow-message.flow-success::before { background: var(--secondary); }
+.flow-message.flow-warning::before { background: #f59e0b; }
+.flow-message.flow-danger::before { background: var(--danger); }
+
+.flow-message strong {
+    color: var(--text-main);
+    font-size: 0.92rem;
+    font-weight: 900;
+}
+
+.flow-message p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.55;
+}
+
 .empty-compact {
     padding: 28px 16px;
     color: var(--text-muted);
@@ -713,12 +880,22 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
         width: 100%;
     }
     .analytics-dashboard-grid { grid-template-columns: 1fr !important; }
+    .flow-panel-header {
+        flex-direction: column;
+    }
+    .flow-badges {
+        justify-content: flex-start;
+    }
+    .flow-highlight-grid {
+        grid-template-columns: 1fr 1fr;
+    }
     .chart-wrap { height: 280px; }
 }
 
 @media (max-width: 430px) {
     .summary-cards { grid-template-columns: 1fr; }
     .header h1 { font-size: 1.25rem; }
+    .flow-highlight-grid { grid-template-columns: 1fr; }
 }
 
 /* ========================================== */

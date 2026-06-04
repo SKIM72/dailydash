@@ -5,6 +5,7 @@ import { appendCell, setText } from './shared/dom.js';
 import { formatCommas, formatPercent, formatWon, parseCommas } from './shared/format.js';
 import { formatDateKey, getDayName, getKstToday, getPreviousMonth, parseDateKey } from './shared/date.js';
 import {
+    analyzeSalesFlow,
     buildDailySummaryFromView,
     compareTotals,
     createInsightMessages,
@@ -310,6 +311,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
             row.append(head, meta, bar);
             container.appendChild(row);
+        });
+    }
+
+    function renderFlowAnalysis(analysis) {
+        const badgeWrap = document.getElementById('rangeFlowBadges');
+        const highlightWrap = document.getElementById('rangeFlowHighlights');
+        const messageWrap = document.getElementById('rangeFlowMessages');
+        if (!badgeWrap || !highlightWrap || !messageWrap) return;
+
+        badgeWrap.replaceChildren();
+        highlightWrap.replaceChildren();
+        messageWrap.replaceChildren();
+
+        analysis.badges.forEach((badge) => {
+            const item = document.createElement('span');
+            item.className = `flow-badge flow-${badge.tone}`;
+            item.textContent = badge.label;
+            badgeWrap.appendChild(item);
+        });
+
+        if (!analysis.highlights.length) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-compact';
+            empty.textContent = '차트 하이라이트가 없습니다.';
+            highlightWrap.appendChild(empty);
+        }
+
+        analysis.highlights.forEach((highlight) => {
+            const card = document.createElement('div');
+            card.className = 'flow-highlight-card';
+
+            const label = document.createElement('span');
+            label.textContent = highlight.label;
+
+            const value = document.createElement('strong');
+            value.textContent = highlight.value;
+
+            const amount = document.createElement('b');
+            const amountText = typeof highlight.amount === 'number' ? formatWon(Math.abs(highlight.amount)) : '';
+            amount.textContent = highlight.amount < 0 ? `-${amountText}` : amountText;
+            amount.className = highlight.amount < 0 ? 'is-negative' : '';
+
+            const meta = document.createElement('small');
+            meta.textContent = highlight.meta;
+
+            card.append(label, value, amount, meta);
+            highlightWrap.appendChild(card);
+        });
+
+        analysis.messages.forEach((message) => {
+            const item = document.createElement('article');
+            item.className = `flow-message flow-${message.tone}`;
+
+            const title = document.createElement('strong');
+            title.textContent = message.title;
+
+            const body = document.createElement('p');
+            body.textContent = message.body;
+
+            item.append(title, body);
+            messageWrap.appendChild(item);
         });
     }
 
@@ -896,6 +958,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const chartFold = document.getElementById('rangeChartFold');
             if (chartFold) chartFold.open = true;
             renderAdvancedAnalytics(dailySummary);
+            renderFlowAnalysis(analyzeSalesFlow(dailySummary));
 
         } catch (err) {
             console.error(err);

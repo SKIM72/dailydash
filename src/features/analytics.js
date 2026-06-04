@@ -32,6 +32,14 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isOperatingDay(day) {
+  return day.count > 0 || day.total > 0 || day.expense > 0;
+}
+
+function getAverageTicket(day) {
+  return day.count > 0 ? Math.round(day.total / day.count) : 0;
+}
+
 export function buildDailySummaryFromView(startStr, endStr, rows) {
   const start = parseDateKey(startStr);
   const end = parseDateKey(endStr);
@@ -87,7 +95,7 @@ export function summarizeDailyMap(dailySummary) {
     totals.total += day.total;
     totals.net += day.net;
 
-    const isOperating = day.count > 0 || day.total > 0 || day.expense > 0;
+    const isOperating = isOperatingDay(day);
     if (isOperating) {
       totals.operatingDays += 1;
       if (day.total > totals.maxSales) {
@@ -130,7 +138,7 @@ export function summarizeWeekdayPerformance(dailySummary) {
 
   Object.entries(dailySummary).forEach(([dateStr, day]) => {
     const index = parseDateKey(dateStr).getDay();
-    const isOperating = day.count > 0 || day.total > 0 || day.expense > 0;
+    const isOperating = isOperatingDay(day);
     rows[index].total += day.total;
     if (isOperating) rows[index].operatingDays += 1;
   });
@@ -200,6 +208,180 @@ export function summarizeDescriptions(transactions, limit = 5) {
     items,
     top: items[0] || null,
     totalSales
+  };
+}
+
+export function analyzeSalesFlow(dailySummary) {
+  const rows = Object.keys(dailySummary).sort().map((date) => ({
+    date,
+    ...dailySummary[date],
+    averageTicket: getAverageTicket(dailySummary[date])
+  }));
+  const activeRows = rows.filter(isOperatingDay);
+  const totalSales = rows.reduce((sum, day) => sum + day.total, 0);
+
+  if (activeRows.length === 0) {
+    return {
+      badges: [{ label: '데이터 없음', tone: 'neutral' }],
+      highlights: [],
+      messages: [{
+        tone: 'neutral',
+        title: '분석 대기',
+        body: '조회 기간에 입력된 매출 데이터가 없어 차트 해석을 만들 수 없습니다.'
+      }]
+    };
+  }
+
+  const bySalesDesc = [...activeRows].sort((a, b) => b.total - a.total);
+  const maxDay = bySalesDesc[0];
+  const minDay = [...activeRows].sort((a, b) => a.total - b.total)[0];
+  const concentrationRate = totalSales > 0 ? (maxDay.total / totalSales) * 100 : 0;
+  const activeRowIndexes = activeRows.map((day) => rows.findIndex((row) => row.date === day.date));
+  const lastActiveIndex = activeRowIndexes[activeRowIndexes.length - 1];
+  const trailingEmptyDays = rows.slice(lastActiveIndex + 1).filter((day) => !isOperatingDay(day)).length;
+
+  const changes = [];
+  for (let index = 1; index < activeRows.length; index += 1) {
+    const previous = activeRows[index - 1];
+    const current = activeRows[index];
+    const diff = current.total - previous.total;
+    changes.push({
+      from: previous.date,
+      to: current.date,
+      diff,
+      rate: previous.total > 0 ? (diff / previous.total) * 100 : null,
+      previous,
+      current
+    });
+  }
+
+  const biggestRise = changes.filter((change) => change.diff > 0).sort((a, b) => b.diff - a.diff)[0] || null;
+  const biggestDrop = changes.filter((change) => change.diff < 0).sort((a, b) => a.diff - b.diff)[0] || null;
+  const ticketRows = activeRows.filter((day) => day.averageTicket > 0);
+  const firstTicketDay = ticketRows[0] || null;
+  const lastTicketDay = ticketRows[ticketRows.length - 1] || null;
+  const ticketDiff = firstTicketDay && lastTicketDay ? lastTicketDay.averageTicket - firstTicketDay.averageTicket : 0;
+  const ticketRate = firstTicketDay?.averageTicket > 0 ? (ticketDiff / firstTicketDay.averageTicket) * 100 : null;
+  const cardMissingDays = activeRows.filter((day) => day.total > 0 && day.card === 0).length;
+  const cashMissingDays = activeRows.filter((day) => day.total > 0 && day.cash === 0).length;
+  const expenseHeavyDays = activeRows.filter((day) => day.total > 0 && (day.expense / day.total) >= 0.3);
+
+  const badges = [];
+  if (concentrationRate >= 60) badges.push({ label: '매출 집중', tone: 'warning' });
+  if (biggestDrop?.rate <= -40) badges.push({ label: '급락 확인', tone: 'danger' });
+  if (trailingEmptyDays > 0) badges.push({ label: '입력 공백', tone: 'warning' });
+  if (expenseHeavyDays.length > 0) badges.push({ label: '지출 비중 높음', tone: 'danger' });
+  if (badges.length === 0) badges.push({ label: '흐름 안정', tone: 'success' });
+
+  const highlights = [
+    {
+      label: '최고 매출일',
+      value: maxDay.date,
+      amount: maxDay.total,
+      meta: `전체 매출의 ${Math.round(concentrationRate).toLocaleString()}%`
+    },
+    {
+      label: '최저 입력일',
+      value: minDay.date,
+      amount: minDay.total,
+      meta: `${activeRows.length.toLocaleString()}영업일 기준`
+    }
+  ];
+
+  if (biggestRise) {
+    highlights.push({
+      label: '최대 증가',
+      value: `${biggestRise.from.slice(5)} → ${biggestRise.to.slice(5)}`,
+      amount: biggestRise.diff,
+      meta: biggestRise.rate === null ? '비교 없음' : `+${Math.round(biggestRise.rate).toLocaleString()}%`
+    });
+  }
+
+  if (biggestDrop) {
+    highlights.push({
+      label: '최대 감소',
+      value: `${biggestDrop.from.slice(5)} → ${biggestDrop.to.slice(5)}`,
+      amount: biggestDrop.diff,
+      meta: biggestDrop.rate === null ? '비교 없음' : `${Math.round(biggestDrop.rate).toLocaleString()}%`
+    });
+  }
+
+  const messages = [];
+  if (concentrationRate >= 60) {
+    messages.push({
+      tone: 'warning',
+      title: '특정 일자 매출 집중',
+      body: `${maxDay.date.slice(5)} 하루가 전체 매출의 ${Math.round(concentrationRate).toLocaleString()}%를 차지합니다. 행사, 단체 주문, 입력 몰림 여부를 확인해보세요.`
+    });
+  } else {
+    messages.push({
+      tone: 'success',
+      title: '매출 분포',
+      body: `최고 매출일 비중은 ${Math.round(concentrationRate).toLocaleString()}%입니다. 특정 일자에 과도하게 몰린 흐름은 아닙니다.`
+    });
+  }
+
+  if (biggestDrop?.rate <= -40) {
+    messages.push({
+      tone: 'danger',
+      title: '급락 구간',
+      body: `${biggestDrop.from.slice(5)}에서 ${biggestDrop.to.slice(5)}로 이동하며 매출이 ${Math.abs(Math.round(biggestDrop.rate)).toLocaleString()}% 감소했습니다. 휴무, 날씨, 입력 누락을 같이 확인하면 좋습니다.`
+    });
+  }
+
+  if (biggestRise?.rate >= 50) {
+    messages.push({
+      tone: 'success',
+      title: '급증 구간',
+      body: `${biggestRise.from.slice(5)}에서 ${biggestRise.to.slice(5)}로 매출이 ${Math.round(biggestRise.rate).toLocaleString()}% 증가했습니다. 해당일 적요 TOP 항목과 같이 보면 원인을 찾기 쉽습니다.`
+    });
+  }
+
+  if (trailingEmptyDays > 0) {
+    messages.push({
+      tone: 'warning',
+      title: '최근 입력 공백',
+      body: `${activeRows[activeRows.length - 1].date.slice(5)} 이후 ${trailingEmptyDays.toLocaleString()}일 동안 매출 입력이 없습니다. 아직 영업 전인지, 입력이 빠졌는지 확인해보세요.`
+    });
+  }
+
+  if (ticketRate !== null && Math.abs(ticketRate) >= 20) {
+    const direction = ticketDiff >= 0 ? '상승' : '하락';
+    messages.push({
+      tone: ticketDiff >= 0 ? 'success' : 'warning',
+      title: '객단가 변화',
+      body: `첫 입력일 대비 마지막 입력일 객단가가 ${Math.abs(Math.round(ticketRate)).toLocaleString()}% ${direction}했습니다. 방문 인원 변화와 함께 보면 판매 단가 흐름을 볼 수 있습니다.`
+    });
+  }
+
+  if (cardMissingDays >= Math.ceil(activeRows.length * 0.6)) {
+    messages.push({
+      tone: 'warning',
+      title: '카드 매출 확인',
+      body: `매출이 있는 ${cardMissingDays.toLocaleString()}일에 카드 매출이 0원입니다. 카드 결제가 실제로 없었는지 입력 누락인지 확인해보세요.`
+    });
+  }
+
+  if (cashMissingDays >= Math.ceil(activeRows.length * 0.6)) {
+    messages.push({
+      tone: 'warning',
+      title: '현금 매출 확인',
+      body: `매출이 있는 ${cashMissingDays.toLocaleString()}일에 현금 매출이 0원입니다. 현금 입력 방식이 일관적인지 확인해보세요.`
+    });
+  }
+
+  if (expenseHeavyDays.length > 0) {
+    messages.push({
+      tone: 'danger',
+      title: '지출 비중 높은 날',
+      body: `${expenseHeavyDays[0].date.slice(5)} 지출이 매출 대비 30% 이상입니다. 재료비, 기타 지출 메모를 함께 확인하면 좋습니다.`
+    });
+  }
+
+  return {
+    badges,
+    highlights: highlights.slice(0, 4),
+    messages: messages.slice(0, 6)
   };
 }
 
