@@ -54,44 +54,39 @@ export function normalizeReport(raw) {
   return report;
 }
 
-export async function generateReport(facts) {
-  const { apiKey, model, baseUrl } = config.gemini;
-  if (!apiKey) throw new HttpError(503, 'AI_DISABLED', 'AI 리포트가 설정되지 않았습니다. 서버에 GEMINI_API_KEY 를 넣어 주세요.');
+// 무료 등급은 혼잡(503)·한도(429)가 잦다. 혼잡이면 잠시 뒤 같은 모델로 다시, 그래도 안 되거나 한도면 예비 모델로 넘어간다.
+const RETRY_DELAYS_MS = [2000, 5000];
+const RETRYABLE = new Set([500, 502, 503, 504]);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  let response;
+async function callModel(model, facts) {
+  const { apiKey, baseUrl } = config.gemini;
   try {
-    response = await fetch(`${baseUrl}/models/${encodeURIComponent(model)}:generateContent`, {
+    const response = await fetch(`${baseUrl}/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: `다음 집계로 ${facts.month} 월간 리포트를 써 주세요.\n\n${JSON.stringify(facts)}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `다음 집계로 ${facts.month} 월간 리포트를 써 주세요.
+
+${JSON.stringify(facts)}` }] }],
         generationConfig: {
           temperature: 0.4,
           responseMimeType: 'application/json',
           responseSchema: REPORT_SCHEMA
         }
       }),
-      signal: AbortSignal.timeout(90_000)
+      signal: AbortSignal.timeout(60_000)
     });
+    const body = await response.json().catch(() => ({}));
+    return { status: response.status, ok: response.ok, body };
   } catch (err) {
-    console.error('[ai] Gemini 연결 실패', err.message);
-    throw new HttpError(502, 'AI_UNREACHABLE', 'AI 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    console.error(`[ai] Gemini 연결 실패 (${model})`, err.message);
+    return { status: 0, ok: false, body: {} };
   }
+}
 
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = body?.error?.message || response.statusText;
-    console.error(`[ai] Gemini 오류 ${response.status}: ${detail}`);
-    if (response.status === 429) {
-      throw new HttpError(429, 'AI_RATE_LIMITED', 'Gemini 무료 사용량 한도에 걸렸습니다. 잠시 후(또는 내일) 다시 시도해 주세요.');
-    }
-    if ([400, 401, 403].includes(response.status) && /api key|permission|unauthori/i.test(detail)) {
-      throw new HttpError(502, 'AI_CONFIG', 'Gemini API 키가 올바르지 않습니다. 서버의 GEMINI_API_KEY 를 확인해 주세요.');
-    }
-    throw new HttpError(502, 'AI_FAILED', `AI 리포트를 만들지 못했습니다. (${response.status})`);
-  }
-
+function parseReport(body, model) {
   if (body?.promptFeedback?.blockReason) {
     throw new HttpError(502, 'AI_BLOCKED', 'AI 가 요청을 처리하지 않았습니다. 잠시 후 다시 시도해 주세요.');
   }
@@ -100,12 +95,44 @@ export async function generateReport(facts) {
     .filter((part) => !part.thought && typeof part.text === 'string')
     .map((part) => part.text)
     .join('');
-  let parsed;
   try {
-    parsed = JSON.parse(text);
-  } catch {
-    console.error('[ai] Gemini 응답 해석 실패', body?.candidates?.[0]?.finishReason, text.slice(0, 200));
+    return normalizeReport(JSON.parse(text));
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    console.error(`[ai] Gemini 응답 해석 실패 (${model})`, body?.candidates?.[0]?.finishReason, text.slice(0, 200));
     throw new HttpError(502, 'AI_BAD_RESPONSE', 'AI 응답을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
-  return { report: normalizeReport(parsed), model: body?.modelVersion || model, usage: body?.usageMetadata || null };
+}
+
+export async function generateReport(facts) {
+  const { apiKey, model, fallbackModel } = config.gemini;
+  if (!apiKey) throw new HttpError(503, 'AI_DISABLED', 'AI 리포트가 설정되지 않았습니다. 서버에 GEMINI_API_KEY 를 넣어 주세요.');
+
+  const models = [...new Set([model, fallbackModel].filter(Boolean))];
+  let lastStatus = 0;
+  for (const candidate of models) {
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+      const result = await callModel(candidate, facts);
+      if (result.ok) {
+        return { report: parseReport(result.body, candidate), model: result.body?.modelVersion || candidate, usage: result.body?.usageMetadata || null };
+      }
+      lastStatus = result.status;
+      const detail = result.body?.error?.message || '';
+      console.error(`[ai] Gemini 오류 ${result.status} (${candidate}, ${attempt + 1}번째): ${detail}`);
+      if ([400, 401, 403].includes(result.status) && /api key|permission|unauthori/i.test(detail)) {
+        throw new HttpError(502, 'AI_CONFIG', 'Gemini API 키가 올바르지 않습니다. 서버의 GEMINI_API_KEY 를 확인해 주세요.');
+      }
+      // 혼잡·연결 실패만 같은 모델로 다시 시도하고, 한도(429)나 그 밖의 오류는 예비 모델로 넘어간다.
+      if (!(RETRYABLE.has(result.status) || result.status === 0) || attempt === RETRY_DELAYS_MS.length) break;
+      await wait(RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  if (lastStatus === 429) {
+    throw new HttpError(429, 'AI_RATE_LIMITED', 'Gemini 무료 사용량 한도에 걸렸습니다. 잠시 후(또는 내일) 다시 시도해 주세요.');
+  }
+  if (RETRYABLE.has(lastStatus) || lastStatus === 0) {
+    throw new HttpError(503, 'AI_BUSY', 'Gemini 서버가 지금 붐빕니다. 몇 분 뒤 다시 시도해 주세요.');
+  }
+  throw new HttpError(502, 'AI_FAILED', `AI 리포트를 만들지 못했습니다. (${lastStatus})`);
 }

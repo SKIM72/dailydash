@@ -44,6 +44,8 @@ export const config = {
   gemini: {
     apiKey: String(env.GEMINI_API_KEY || '').trim(),
     model: String(env.GEMINI_MODEL || 'gemini-3.8-flash').trim(),
+    // 기본 모델이 붐비거나 무료 한도에 걸리면 이 모델로 한 번 더 시도한다. (무료 한도는 모델마다 따로)
+    fallbackModel: String(env.GEMINI_FALLBACK_MODEL ?? 'gemini-3.5-flash-lite').trim(),
     baseUrl: String(env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/+$/, '')
   }
 };

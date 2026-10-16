@@ -33,12 +33,17 @@
    docker compose logs --tail 20 app   # "[ai] AI 월간 리포트 사용" 이 보이면 성공
    ```
 
-끄려면 `GEMINI_API_KEY=` 를 비우고 같은 명령으로 다시 시작합니다. 기본 모델은 `gemini-3.8-flash` 이며, 바꾸려면 `.env` 에 `GEMINI_MODEL=모델이름` 을 넣습니다.
+끄려면 `GEMINI_API_KEY=` 를 비우고 같은 명령으로 다시 시작합니다.
+
+기본 모델은 `gemini-3.8-flash` 입니다. 무료 등급은 Google 쪽이 붐비거나(503) 한도(429)에 걸리는 일이 잦아서,
+붐비면 몇 초 뒤 자동으로 다시 시도하고, 그래도 안 되면 가벼운 예비 모델 `gemini-3.5-flash-lite` 로 넘어갑니다. (무료 한도는 모델마다 따로)
+바꾸려면 `.env` 에 `GEMINI_MODEL=` / `GEMINI_FALLBACK_MODEL=` 을 넣습니다.
 
 ## 문제 해결
 
 | 화면 안내 | 원인 · 해결 |
 | --- | --- |
+| Gemini 서버가 지금 붐빕니다 | Google 쪽 일시적인 혼잡입니다. 자동 재시도와 예비 모델까지 실패한 경우라 몇 분 뒤 다시 시도합니다. |
 | Gemini 무료 사용량 한도에 걸렸습니다 | 분당/하루 무료 한도를 넘었습니다. 잠시 뒤(또는 다음 날) 다시 시도합니다. 한도는 [AI Studio 사용량 페이지](https://aistudio.google.com/rate-limit)에서 확인합니다. |
 | Gemini API 키가 올바르지 않습니다 | `.env` 의 키가 틀렸거나 삭제된 키입니다. 새 키로 바꾸고 앱을 다시 시작합니다. |
 | AI 응답을 읽지 못했습니다 | 일시적인 응답 오류입니다. 다시 시도합니다. 계속되면 `docker compose logs app` 의 `[ai]` 줄을 확인합니다. |
