@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>DailyDash 앱 설치</title>
+    <meta name="description" content="하늘향 매출 장부 DailyDash 를 휴대폰·PC 에 앱으로 설치하는 방법">
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#f7f8fc">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="DailyDash">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+    <script>
+        (() => {
+            let preference = 'system';
+            let scale = 1;
+            try {
+                const stored = localStorage.getItem('dailydash-theme-preference');
+                if (['system', 'light', 'dark'].includes(stored)) preference = stored;
+                const storedScale = Number(localStorage.getItem('dailydash-text-scale'));
+                if (storedScale >= 0.9 && storedScale <= 1.3) scale = storedScale;
+            } catch {
+                preference = 'system';
+            }
+            const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const root = document.documentElement;
+            root.dataset.theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+            root.dataset.themePreference = preference;
+            root.style.setProperty('--text-scale', String(scale));
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="install-body">
+    <header class="install-top glass">
+        <a class="install-top__brand" href="index.html">
+            <span class="brand-mark"><img src="/icons/icon-192.png" alt=""></span>
+            DailyDash
+        </a>
+        <button type="button" class="icon-btn" id="themeToggleBtn" aria-label="화면 모드 바꾸기" title="화면 모드 바꾸기"><i data-icon="moon"></i></button>
+        <a class="btn btn-tonal" href="index.html"><i data-icon="login"></i>DailyDash 열기</a>
+    </header>
+
+    <main class="install-page">
+        <section class="install-hero" aria-labelledby="installTitle">
+            <img class="install-hero__icon" src="/icons/icon-512.png" alt="DailyDash 앱 아이콘">
+            <div>
+                <h1 id="installTitle">DailyDash 앱 설치</h1>
+                <p>하늘향 매출 장부를 홈 화면에 추가하면 앱처럼 한 번에 열리고, 주소창 없이 넓은 화면으로 쓸 수 있어요.</p>
+                <div class="install-hero__actions">
+                    <button type="button" class="btn btn-filled btn--lg hidden-view" id="installBtn"><i data-icon="download"></i>앱 설치하기</button>
+                    <a class="btn btn-outlined btn--lg" href="#guide" id="guideBtn"><i data-icon="info"></i>설치 방법 보기</a>
+                    <span class="install-status hidden-view" id="installedStatus" role="status"><i data-icon="check" data-variant="bold"></i>지금 앱으로 실행 중이에요</span>
+                </div>
+            </div>
+            <img class="install-hero__wordmark" src="/brand/wordmark-light.png" alt="">
+        </section>
+
+        <section class="install-perks" aria-label="앱으로 쓰면 좋은 점">
+            <div class="install-perk"><i data-icon="flash"></i><strong>바로 실행</strong><small>홈 화면 아이콘을 누르면 앱처럼 바로 열려요.</small></div>
+            <div class="install-perk"><i data-icon="refresh"></i><strong>자동 업데이트</strong><small>스토어 없이 항상 최신 버전으로 열려요.</small></div>
+            <div class="install-perk"><i data-icon="shield"></i><strong>안전한 보관</strong><small>입력한 내역은 가게 서버에 저장되고 매일 백업돼요.</small></div>
+        </section>
+
+        <section class="install-guides" id="guide" aria-label="기기별 설치 방법">
+            <details class="install-guide" data-platform="ios">
+                <summary><i data-icon="mobile"></i>아이폰 · 아이패드<span class="chip chip--static hidden-view" data-this-device>이 기기</span><i data-icon="arrow-down" data-variant="bold"></i></summary>
+                <ol class="install-steps">
+                    <li><span><strong>Safari</strong> 로 이 페이지를 열어 주세요. <span class="muted" id="iosOtherBrowserNote">(iOS 16.4 이상은 Chrome 에서도 가능해요)</span></span></li>
+                    <li><span>화면 아래(아이패드는 위)의 <strong>공유</strong> 버튼 <i data-icon="share"></i> 을 누르세요.</span></li>
+                    <li><span>목록을 내려 <strong>홈 화면에 추가</strong> <i data-icon="add-square"></i> 를 고르세요.</span></li>
+                    <li><span>오른쪽 위 <strong>추가</strong>를 누르면 끝! 홈 화면의 DailyDash 아이콘으로 실행하세요.</span></li>
+                </ol>
+            </details>
+            <details class="install-guide" data-platform="android">
+                <summary><i data-icon="mobile"></i>안드로이드 (Chrome · 삼성 인터넷)<span class="chip chip--static hidden-view" data-this-device>이 기기</span><i data-icon="arrow-down" data-variant="bold"></i></summary>
+                <ol class="install-steps">
+                    <li><span>위의 <strong>앱 설치하기</strong> 버튼을 누르세요. 버튼이 안 보이면 다음 단계로 진행하세요.</span></li>
+                    <li><span>브라우저 오른쪽 위(삼성 인터넷은 아래) <strong>⋮ 메뉴</strong>를 여세요.</span></li>
+                    <li><span><strong>앱 설치</strong> 또는 <strong>홈 화면에 추가</strong>를 누르세요.</span></li>
+                    <li><span>설치가 끝나면 홈 화면과 앱 목록에 DailyDash 가 생겨요.</span></li>
+                </ol>
+            </details>
+            <details class="install-guide" data-platform="desktop">
+                <summary><i data-icon="monitor"></i>PC (Chrome · Edge)<span class="chip chip--static hidden-view" data-this-device>이 기기</span><i data-icon="arrow-down" data-variant="bold"></i></summary>
+                <ol class="install-steps">
+                    <li><span>위의 <strong>앱 설치하기</strong> 버튼을 누르거나, 주소창 오른쪽의 <strong>설치 아이콘</strong>을 누르세요.</span></li>
+                    <li><span><strong>설치</strong>를 누르면 바탕 화면과 시작 메뉴에 DailyDash 가 생겨요.</span></li>
+                </ol>
+            </details>
+        </section>
+
+        <section class="card card--outlined install-qr" aria-labelledby="qrTitle">
+            <div class="install-qr__code" id="qrCode" role="img" aria-label="이 설치 안내 페이지로 연결되는 QR 코드"></div>
+            <div>
+                <h2 class="t-title-m" id="qrTitle">휴대폰으로 열기</h2>
+                <p class="muted t-body-m" style="margin: 0.25rem 0 0.75rem;">휴대폰 카메라로 QR 코드를 비추면 이 설치 안내가 열려요. 직원분들께 링크를 보내도 돼요.</p>
+                <button type="button" class="btn btn-tonal" id="copyLinkBtn"><i data-icon="copy"></i>링크 복사</button>
+            </div>
+        </section>
+
+        <section class="card card--outlined install-faq" aria-labelledby="faqTitle">
+            <h2 class="t-title-m" id="faqTitle" style="margin-bottom: 0.5rem;">자주 묻는 질문</h2>
+            <details>
+                <summary>앱스토어 · 플레이스토어에는 없나요?</summary>
+                <p>DailyDash 는 웹 앱(PWA)이라 스토어를 거치지 않고 이 페이지에서 바로 설치해요. 용량이 작고, 따로 업데이트할 필요도 없어요.</p>
+            </details>
+            <details>
+                <summary>업데이트는 어떻게 하나요?</summary>
+                <p>새 버전이 나오면 앱을 열 때 자동으로 받아요. 화면 아래에 "새 버전이 준비됐어요" 가 보이면 새로고침을 눌러 주세요.</p>
+            </details>
+            <details>
+                <summary>입력한 데이터는 휴대폰에 저장되나요?</summary>
+                <p>아니요. 모든 내역은 가게 서버에 저장되고 매일 자동 백업돼요. 휴대폰을 바꿔도 로그인만 하면 그대로예요.</p>
+            </details>
+            <details>
+                <summary>설치 버튼이 안 보여요.</summary>
+                <p>이미 설치되어 있거나, 브라우저가 버튼 설치를 지원하지 않는 경우예요. 위의 기기별 설치 방법을 따라 해 주세요. 아이폰은 공유 메뉴의 "홈 화면에 추가" 로 설치해요.</p>
+            </details>
+            <details>
+                <summary>앱을 지우려면?</summary>
+                <p>홈 화면의 DailyDash 아이콘을 길게 눌러 삭제하면 돼요. 서버의 데이터는 그대로 남아 있어요.</p>
+            </details>
+        </section>
+    </main>
+
+    <script type="module" src="/src/install.js"></script>
+</body>
+</html>

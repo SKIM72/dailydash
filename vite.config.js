@@ -46,7 +46,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: resolve(__dirname, 'index.html'),
-        login: resolve(__dirname, 'login.html')
+        login: resolve(__dirname, 'login.html'),
+        install: resolve(__dirname, 'install.html')
       }
     }
   }

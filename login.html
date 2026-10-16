@@ -10,8 +10,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="DailyDash">
-    <link rel="apple-touch-icon" href="/icon.jpeg">
-    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
     <script>
         (() => {
             let preference = 'system';
@@ -41,11 +42,12 @@
     <!-- 소개 영역 (데스크톱) -->
     <section class="auth-hero" aria-hidden="true">
         <div class="auth-hero__brand">
-            <span class="brand-mark"><img src="/icon.jpeg" alt=""></span>
+            <span class="brand-mark"><img src="/icons/icon-192.png" alt=""></span>
             DailyDash
         </div>
         <div>
-            <h1>오늘의 매출을<br>한눈에, 정확하게</h1>
+            <img class="auth-hero__wordmark" src="/brand/wordmark-light.png" alt="세상의 첫번째 향기 하늘향">
+            <h1 style="margin-top: 1.75rem;">오늘의 매출을<br>한눈에, 정확하게</h1>
             <p>가게 정산부터 월간 요약, 통계 분석까지. 매일의 장사를 숫자로 차곡차곡 쌓아 보세요.</p>
         </div>
         <div class="auth-features">
@@ -62,8 +64,8 @@
 
         <div class="auth-card">
             <div class="auth-card__logo">
-                <span class="brand-mark"><img src="/icon.jpeg" alt="DailyDash 로고"></span>
-                <div><strong class="t-title-m">DailyDash</strong><br><span class="login-version" data-app-version>v0.8.0</span></div>
+                <span class="brand-mark"><img src="/icons/icon-192.png" alt="DailyDash 로고"></span>
+                <div><strong class="t-title-m">DailyDash</strong><br><span class="login-version" data-app-version>v0.9.0</span></div>
             </div>
 
             <!-- 로그인 -->
@@ -95,6 +97,9 @@
                 </form>
                 <div class="auth-divider">처음이신가요?</div>
                 <button type="button" class="btn btn-outlined btn--lg btn--block" data-view="signup"><i data-icon="user-add"></i>회원가입 신청</button>
+                <div class="auth-install-link" data-install-entry>
+                    <a class="btn btn-text" href="install.html"><i data-icon="mobile"></i>휴대폰에 앱으로 설치하기</a>
+                </div>
             </div>
 
             <!-- 회원가입 -->

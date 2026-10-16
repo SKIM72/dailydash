@@ -24,8 +24,15 @@ const ICON_MAP = {
   logout: ['LogoutCurve', 'bulk'],
   login: ['LoginCurve', 'bulk'],
   shop: ['Shop', 'bulk', 'bold'],
+  // 앱 설치 안내
+  mobile: ['Mobile', 'bulk'],
+  share: ['Export', 'bulk'],
+  'add-square': ['AddSquare', 'bulk'],
+  scan: ['ScanBarcode', 'bulk'],
+  flash: ['Flash', 'bulk'],
+  copy: ['Copy', 'bulk'],
   // 기본 동작
-  add: ['Add', 'bold'],
+  add: ['Add', 'bold', 'linear'],
   'add-circle': ['AddCircle', 'bulk', 'bold'],
   edit: ['Edit2', 'bulk'],
   trash: ['Trash', 'bulk'],
@@ -88,7 +95,7 @@ const ICON_MAP = {
   text: ['Text', 'bulk']
 };
 
-const VARIANT_NAMES = { bulk: 'Bulk', bold: 'Bold' };
+const VARIANT_NAMES = { bulk: 'Bulk', bold: 'Bold', linear: 'Linear' };
 
 function extractBody(component, variant) {
   const markup = renderToStaticMarkup(

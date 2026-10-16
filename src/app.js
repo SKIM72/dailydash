@@ -17,7 +17,17 @@ import {
 import { iconElement, iconSvg } from './shared/icons.js';
 import { installConfirmSwitch, installTextScaleSlider, isConfirmBeforeSave } from './shared/settings.js';
 import { installThemeControls } from './shared/theme.js';
-import { createSheet, installDrawer, installMenus, installTabs, isMobileLayout, showActionMenu } from './shared/ui.js';
+import { hideInstallEntriesWhenStandalone, registerServiceWorker } from './shared/pwa.js';
+import {
+    createSheet,
+    installDrawer,
+    installMenus,
+    installNavIndicators,
+    installTabs,
+    isMobileLayout,
+    runViewTransition,
+    showActionMenu
+} from './shared/ui.js';
 import { APP_VERSION_LABEL, renderVersionLabels } from './shared/version.js';
 
 installModalHandlers();
@@ -27,21 +37,16 @@ installMenus();
 document.addEventListener('DOMContentLoaded', () => {
     renderVersionLabels();
 
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            const isLocalPreview = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
-            if (isLocalPreview) {
-                navigator.serviceWorker.getRegistrations?.().then((registrations) => {
-                    registrations.forEach((registration) => registration.unregister());
-                });
-                window.caches?.keys?.().then((keys) => {
-                    keys.filter((key) => key.startsWith('dailydash')).forEach((key) => caches.delete(key));
-                });
-                return;
-            }
-            navigator.serviceWorker.register('sw.js').then(reg => console.log('PWA OK:', reg.scope), err => console.log('PWA Fail:', err));
-        });
-    }
+    // 배포 후 열려 있던 화면에는 새로고침을 안내한다.
+    registerServiceWorker({
+        onUpdate: () => showToast('새 버전이 준비됐어요.', {
+            tone: 'info',
+            duration: 10 * 60 * 1000,
+            actionLabel: '새로고침',
+            onAction: () => window.location.reload()
+        })
+    });
+    hideInstallEntriesWhenStandalone();
 
     // DOM 요소 캐싱
     const datePicker = document.getElementById('currentDate');
@@ -118,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const myPageDialog = bindDismissibleModal(myPageModal, closeMyPage);
     const detailDialog = bindDismissibleModal(document.getElementById('dailyDetailModal'), document.getElementById('closeDetailModal'));
     const drawer = installDrawer(document.getElementById('navDrawer'), document.getElementById('drawerScrim'));
+    const navIndicators = installNavIndicators();
     const entrySheet = createSheet(document.getElementById('entryPanel'), document.getElementById('sheetScrim'), {
         onOpen: () => document.getElementById('desc')?.focus({ preventScroll: true })
     });
@@ -953,7 +959,25 @@ document.addEventListener('DOMContentLoaded', () => {
         changePasswordForm?.addEventListener('submit', handleChangePassword);
 
         updateAppBar();
+        openFromShortcut(today);
+    }
+
+    // 홈 화면 아이콘을 길게 눌러 나오는 바로가기(?view=monthly, ?action=new)를 처리한다.
+    function openFromShortcut(today) {
+        const params = new URLSearchParams(window.location.search);
+        const view = params.get('view');
+        const action = params.get('action');
+        if (params.toString()) history.replaceState(null, '', window.location.pathname);
+
+        if (view && view !== 'daily' && VIEWS[view]) {
+            switchTab(view);
+            return;
+        }
         loadDailyData(today);
+        if (action === 'new') {
+            if (isMobileLayout()) entrySheet.open();
+            else document.getElementById('desc')?.focus();
+        }
     }
 
     function renderAccountInfo() {
@@ -1718,21 +1742,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const VIEW_ORDER = ['daily', 'monthly', 'total'];
+
     function switchTab(tabName, { date } = {}) {
         if (!VIEWS[tabName]) return;
-        currentView = tabName;
-        Object.entries(VIEWS).forEach(([name, view]) => view.el.classList.toggle('hidden-view', name !== tabName));
-        document.querySelectorAll('[data-nav]').forEach((item) => {
-            const active = item.dataset.nav === tabName;
-            item.classList.toggle('active', active);
-            if (active) item.setAttribute('aria-current', 'page');
-            else item.removeAttribute('aria-current');
-        });
-        // 입력 버튼(FAB)은 일일 내역에서만 보인다.
-        entryFab?.classList.toggle('is-hidden', tabName !== 'daily');
-        if (tabName !== 'daily') entrySheet.close();
-        updateAppBar();
-        window.scrollTo({ top: 0 });
+        const previousView = currentView;
+        const applyView = () => {
+            currentView = tabName;
+            Object.entries(VIEWS).forEach(([name, view]) => view.el.classList.toggle('hidden-view', name !== tabName));
+            document.querySelectorAll('[data-nav]').forEach((item) => {
+                const active = item.dataset.nav === tabName;
+                item.classList.toggle('active', active);
+                if (active) item.setAttribute('aria-current', 'page');
+                else item.removeAttribute('aria-current');
+            });
+            navIndicators.update();
+            // 입력 버튼(FAB)은 일일 내역에서만 보인다.
+            entryFab?.classList.toggle('is-hidden', tabName !== 'daily');
+            if (tabName !== 'daily') entrySheet.close();
+            updateAppBar();
+            window.scrollTo({ top: 0 });
+        };
+
+        if (previousView === tabName) {
+            applyView();
+        } else {
+            // 메뉴 순서상 오른쪽으로 가면 앞으로, 왼쪽이면 뒤로 미끄러진다.
+            const direction = VIEW_ORDER.indexOf(tabName) > VIEW_ORDER.indexOf(previousView) ? 'forward' : 'back';
+            runViewTransition(applyView, { direction, target: VIEWS[tabName].el });
+        }
 
         if (tabName === 'daily') {
             if (date && date !== currentDailyDate) changeDailyDate(date);

@@ -186,6 +186,62 @@ export function createSheet(panel, scrim, { onOpen } = {}) {
   return { open, close, isOpen };
 }
 
+/* ---------------- 미끄러지는 선택 표시 (사이드바 · 하단 탭 바) ---------------- */
+// [data-indicator-group] 안의 .nav-indicator 를 현재 선택된(.active) 항목 위치로 옮긴다.
+export function installNavIndicators(root = document) {
+  const groups = [...root.querySelectorAll('[data-indicator-group]')];
+
+  const update = ({ animate = true } = {}) => {
+    groups.forEach((group) => {
+      const indicator = group.querySelector('.nav-indicator');
+      if (!indicator) return;
+      group.classList.add('has-indicator');
+      if (!animate) group.classList.add('no-anim');
+      const active = group.querySelector(':scope > .active');
+      if (!active || active.offsetParent === null) {
+        indicator.style.opacity = '0';
+      } else {
+        indicator.style.opacity = '1';
+        indicator.style.width = `${active.offsetWidth}px`;
+        indicator.style.height = `${active.offsetHeight}px`;
+        indicator.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+      }
+      if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => group.classList.remove('no-anim')));
+    });
+  };
+
+  update({ animate: false });
+  // 화면 크기·글자 크기가 바뀌거나 글꼴이 늦게 로드돼도 위치를 다시 맞춘다.
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(() => update({ animate: false }));
+    groups.forEach((group) => observer.observe(group));
+  }
+  document.fonts?.ready.then(() => update({ animate: false }));
+  return { update };
+}
+
+/* ---------------- 화면 전환 효과 ---------------- */
+// View Transitions 를 지원하면 이전/새 화면을 부드럽게 교차시키고, 아니면 새 화면에 등장 애니메이션만 준다.
+export function runViewTransition(update, { direction = 'forward', target = null } = {}) {
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const root = document.documentElement;
+  root.dataset.navDirection = direction;
+  if (!reduceMotion && typeof document.startViewTransition === 'function') {
+    // view-transition-name 은 새 쌓임 순서를 만들어 바텀시트 같은 겹침 요소를 가리므로, 전환하는 동안에만 붙인다.
+    root.classList.add('is-view-transitioning');
+    const transition = document.startViewTransition(() => update());
+    transition.finished.finally(() => root.classList.remove('is-view-transitioning'));
+    return;
+  }
+  update();
+  if (!reduceMotion && target) {
+    target.classList.remove('view-enter');
+    void target.offsetWidth;
+    target.classList.add('view-enter');
+    target.addEventListener('animationend', () => target.classList.remove('view-enter'), { once: true });
+  }
+}
+
 /* ---------------- 탭 ---------------- */
 export function installTabs(tablist, panelRoot, { onChange } = {}) {
   const tabs = () => [...tablist.querySelectorAll('[role="tab"][data-tab]:not(.hidden-view)')];

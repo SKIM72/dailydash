@@ -8,6 +8,7 @@
 4. 권한은 서버가 검사합니다. 수정·삭제·복원·사용자 관리·엑셀 백업 이력은 관리자(`role = admin`)만 가능하며,
    승인되지 않은(`pending`)·사용 중지된(`disabled`) 계정은 어떤 데이터에도 접근할 수 없습니다.
 5. 반영 후 `docker compose ps` 로 app 이 `healthy` 인지, `docker compose logs --tail 50 app` 에 오류가 없는지 확인합니다.
-6. 서비스워커 캐시가 남아 옛 화면이 보이면 새로고침 또는 앱 재설치를 안내합니다.
+6. 화면을 바꿔 배포할 때는 `public/sw.js` 의 `CACHE_NAME` 을 올립니다. 열려 있던 앱에 새로고침 안내가 뜹니다.
+   그래도 옛 화면이 보이면 앱을 완전히 닫았다가 다시 열도록 안내합니다.
 
 전체 운영 방법은 [SERVER-SETUP.md](SERVER-SETUP.md) 를 참고하세요.

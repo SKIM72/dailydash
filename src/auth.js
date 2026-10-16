@@ -2,11 +2,13 @@ import '../style.css';
 import { api, getCurrentUser } from './services/api.js';
 import { setIcon } from './shared/icons.js';
 import { installModalHandlers } from './shared/modal.js';
+import { hideInstallEntriesWhenStandalone, registerServiceWorker } from './shared/pwa.js';
 import { initTheme, resolveTheme, toggleTheme } from './shared/theme.js';
 import { renderVersionLabels } from './shared/version.js';
 
 installModalHandlers();
 initTheme();
+registerServiceWorker();
 
 const REMEMBER_EMAIL_KEY = 'savedDailyDashEmail';
 const VIEWS = ['login', 'signup', 'reset', 'update-password'];
@@ -254,6 +256,7 @@ function bindUpdatePasswordForm() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     renderVersionLabels();
+    hideInstallEntriesWhenStandalone();
     bindStaticControls();
     bindLoginForm();
     bindSignupForm();
