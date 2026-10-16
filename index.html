@@ -342,11 +342,16 @@
             <div class="metric-grid">
                 <div class="metric"><span class="metric__icon"><i data-icon="chart"></i></span><div><p class="metric__label">영업일 평균 매출</p><p class="metric__value" id="monthAvgSales">0</p></div></div>
                 <div class="metric tone-neutral"><span class="metric__icon"><i data-icon="receipt"></i></span><div><p class="metric__label">객단가</p><p class="metric__value" id="monthAvgTicket">0</p></div></div>
-                <div class="metric"><span class="metric__icon"><i data-icon="trend-up"></i></span><div><p class="metric__label">전월 대비</p><p class="metric__value" id="monthCompareSales">-</p></div></div>
+                <div class="metric"><span class="metric__icon"><i data-icon="trend-up"></i></span><div><p class="metric__label">전년 동기 대비</p><p class="metric__value" id="monthCompareSales">-</p></div></div>
                 <div class="metric tone-card"><span class="metric__icon"><i data-icon="crown"></i></span><div><p class="metric__label">최고 매출 달성일</p><p class="metric__value" id="monthMaxSalesDay">-</p></div></div>
                 <div class="metric tone-cash"><span class="metric__icon"><i data-icon="ratio"></i></span><div><p class="metric__label">현금 결제 비중</p><p class="metric__value" id="monthCashRatio">0%</p></div></div>
                 <div class="metric tone-people"><span class="metric__icon"><i data-icon="calendar-search"></i></span><div><p class="metric__label">입력/영업일 수</p><p class="metric__value" id="monthOperatingDays">0일</p></div></div>
             </div>
+
+            <section class="card card--outlined compare-panel" aria-labelledby="monthCompareTitle">
+                <div class="section-head"><h2 id="monthCompareTitle"><i data-icon="graph"></i>기간 비교</h2><span class="compare-panel__note">같은 날짜 범위끼리 · 영업일당 평균 포함</span></div>
+                <div class="compare-list" id="monthCompareList"><div class="empty-compact">월을 선택하면 같은 기간끼리 비교합니다.</div></div>
+            </section>
 
             <section class="card card--outlined insight-panel">
                 <div class="section-head"><h2><i data-icon="insight"></i>월간 인사이트</h2></div>
@@ -441,11 +446,16 @@
             <div class="metric-grid">
                 <div class="metric"><span class="metric__icon"><i data-icon="chart"></i></span><div><p class="metric__label">영업일 평균 매출</p><p class="metric__value" id="rangeAvgSales">0</p></div></div>
                 <div class="metric tone-neutral"><span class="metric__icon"><i data-icon="receipt"></i></span><div><p class="metric__label">객단가</p><p class="metric__value" id="rangeAvgTicket">0</p></div></div>
-                <div class="metric"><span class="metric__icon"><i data-icon="trend-up"></i></span><div><p class="metric__label">이전 동기간 대비</p><p class="metric__value" id="rangeCompareSales">-</p></div></div>
+                <div class="metric"><span class="metric__icon"><i data-icon="trend-up"></i></span><div><p class="metric__label">전년 동기 대비</p><p class="metric__value" id="rangeCompareSales">-</p></div></div>
                 <div class="metric tone-card"><span class="metric__icon"><i data-icon="crown"></i></span><div><p class="metric__label">기간 내 최고 매출일</p><p class="metric__value" id="rangeMaxSalesDay">-</p></div></div>
                 <div class="metric tone-cash"><span class="metric__icon"><i data-icon="ratio"></i></span><div><p class="metric__label">현금 결제 비중</p><p class="metric__value" id="rangeCashRatio">0%</p></div></div>
                 <div class="metric tone-people"><span class="metric__icon"><i data-icon="calendar-search"></i></span><div><p class="metric__label">입력/영업일 수</p><p class="metric__value" id="rangeOperatingDays">0일</p></div></div>
             </div>
+
+            <section class="card card--outlined compare-panel" aria-labelledby="rangeCompareTitle">
+                <div class="section-head"><h2 id="rangeCompareTitle"><i data-icon="graph"></i>기간 비교</h2><span class="compare-panel__note">같은 날짜 범위끼리 · 영업일당 평균 포함</span></div>
+                <div class="compare-list" id="rangeCompareList"><div class="empty-compact">기간을 조회하면 같은 기간끼리 비교합니다.</div></div>
+            </section>
 
             <section class="card card--outlined insight-panel">
                 <div class="section-head"><h2><i data-icon="insight"></i>기간 인사이트</h2></div>

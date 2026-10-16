@@ -834,6 +834,86 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getLastDayOfMonth(year, month) {
+        return new Date(year, month, 0).getDate();
+    }
+
+    // 1년 전 같은 날짜. 2월 29일처럼 작년에 없는 날은 그달 마지막 날로 맞춘다.
+    function shiftYearKey(dateStr, years = -1) {
+        const year = Number(dateStr.slice(0, 4)) + years;
+        const month = Number(dateStr.slice(5, 7));
+        const day = Math.min(Number(dateStr.slice(8, 10)), getLastDayOfMonth(year, month));
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function pickDailyRange(dailySummary, startStr, endStr) {
+        return Object.fromEntries(Object.entries(dailySummary).filter(([date]) => date >= startStr && date <= endStr));
+    }
+
+    function formatPeriodLabel(startStr, endStr) {
+        const full = (date) => date.replaceAll('-', '.');
+        if (startStr === endStr) return full(startStr);
+        const end = startStr.slice(0, 4) === endStr.slice(0, 4) ? endStr.slice(5).replace('-', '.') : full(endStr);
+        return `${full(startStr)} ~ ${end}`;
+    }
+
+    function createCompareStat(label, value, delta) {
+        const stat = document.createElement('div');
+        stat.className = 'compare-stat';
+        const caption = document.createElement('small');
+        caption.textContent = label;
+        const amount = document.createElement('b');
+        amount.textContent = value;
+        stat.append(caption, amount);
+        if (delta) stat.append(delta);
+        return stat;
+    }
+
+    // "이번 달 -59%" 처럼, 기준 기간 대비 지금 기간이 얼마나 다른지 보여 준다.
+    function createCompareDelta(prefix, rate, diff) {
+        const chip = document.createElement('span');
+        chip.className = `compare-delta ${getTrendTone(diff)}`.trim();
+        chip.textContent = rate === null ? '비교 없음' : `${prefix} ${diff >= 0 ? '+' : '-'}${Math.abs(Math.round(rate)).toLocaleString()}%`;
+        return chip;
+    }
+
+    // rows: [{ label, start, end, summary, comparison?, kind?: 'current' | 'reference', note? }]
+    function renderComparePanel(containerId, rows, currentLabel) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.replaceChildren(...rows.map((row) => {
+            const item = document.createElement('div');
+            item.className = `compare-row${row.kind ? ` compare-row--${row.kind}` : ''}`;
+            const head = document.createElement('div');
+            head.className = 'compare-row__head';
+            const title = document.createElement('strong');
+            title.textContent = row.label;
+            const period = document.createElement('small');
+            period.textContent = formatPeriodLabel(row.start, row.end);
+            head.append(title, period);
+
+            const stats = document.createElement('div');
+            stats.className = 'compare-row__stats';
+            const { summary, comparison } = row;
+            stats.append(
+                createCompareStat('매출', formatCompactWon(summary.total), comparison && createCompareDelta(currentLabel, comparison.rate, comparison.diff)),
+                createCompareStat(
+                    `영업일당 · ${summary.operatingDays.toLocaleString()}일`,
+                    summary.operatingDays > 0 ? formatCompactWon(summary.averageSales) : '-',
+                    comparison && createCompareDelta(currentLabel, comparison.averageRate, comparison.averageDiff)
+                )
+            );
+            item.append(head, stats);
+            if (row.note) {
+                const note = document.createElement('p');
+                note.className = 'compare-row__note';
+                note.textContent = row.note;
+                item.append(note);
+            }
+            return item;
+        }));
+    }
+
     function getPreviousRange(startStr, endStr) {
         const start = parseDateKey(startStr);
         const end = parseDateKey(endStr);
@@ -1833,27 +1913,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const seq = ++monthlyLoadSeq;
         try {
             setEmptyTableMessage(monthlyTableBody, 11, '데이터를 분석하는 중...');
+            const pad = (value) => String(value).padStart(2, '0');
+            const [year, month] = monthStr.split('-').map(Number);
             const startDate = `${monthStr}-01`;
-            const lastDay = new Date(monthStr.split('-')[0], monthStr.split('-')[1], 0).getDate();
-            const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
+            const lastDay = getLastDayOfMonth(year, month);
+            const endDate = `${monthStr}-${pad(lastDay)}`;
+
+            // 진행 중인 달은 오늘까지만 비교한다. (지난달 전체와 비교하면 늘 크게 줄어든 것처럼 보인다)
+            const today = getKstToday();
+            const isCurrentMonth = monthStr === today.slice(0, 7);
+            const compareDay = isCurrentMonth ? Number(today.slice(8, 10)) : lastDay;
+            const compareEnd = `${monthStr}-${pad(compareDay)}`;
 
             const prevMonth = getPreviousMonth(monthStr);
-            const prevLastDay = new Date(prevMonth.split('-')[0], prevMonth.split('-')[1], 0).getDate();
+            const prevLastDay = getLastDayOfMonth(Number(prevMonth.slice(0, 4)), Number(prevMonth.slice(5, 7)));
             const prevStartDate = `${prevMonth}-01`;
-            const prevEndDate = `${prevMonth}-${String(prevLastDay).padStart(2, '0')}`;
+            const prevEndDate = `${prevMonth}-${pad(isCurrentMonth ? Math.min(compareDay, prevLastDay) : prevLastDay)}`;
 
-            const { summaryRows, prevSummaryRows, transactions, previousTransactions } =
-                await fetchPeriodBundle(startDate, endDate, prevStartDate, prevEndDate);
+            // 계절 영향이 큰 가게라 작년 같은 달과의 비교를 가장 먼저 본다.
+            const lastYearMonth = `${year - 1}-${pad(month)}`;
+            const lastYearLastDay = getLastDayOfMonth(year - 1, month);
+            const lastYearStart = `${lastYearMonth}-01`;
+            const lastYearEnd = `${lastYearMonth}-${pad(lastYearLastDay)}`;
+            const lastYearCompareEnd = `${lastYearMonth}-${pad(isCurrentMonth ? Math.min(compareDay, lastYearLastDay) : lastYearLastDay)}`;
+
+            const [{ summaryRows, prevSummaryRows, transactions, previousTransactions }, lastYearRows] = await Promise.all([
+                fetchPeriodBundle(startDate, endDate, prevStartDate, prevEndDate),
+                fetchDailySalesSummary(lastYearStart, lastYearEnd)
+            ]);
             if (seq !== monthlyLoadSeq) return;
 
             const dailySummary = buildDailySummaryFromView(startDate, endDate, summaryRows);
             const summary = summarizeDailyMap(dailySummary);
+            const compareSummary = summarizeDailyMap(pickDailyRange(dailySummary, startDate, compareEnd));
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(prevStartDate, prevEndDate, prevSummaryRows));
-            const comparison = compareTotals(summary, prevSummary);
+            const lastYearDaily = buildDailySummaryFromView(lastYearStart, lastYearEnd, lastYearRows);
+            const lastYearSummary = summarizeDailyMap(pickDailyRange(lastYearDaily, lastYearStart, lastYearCompareEnd));
+            const monthComparison = { label: isCurrentMonth ? '전월 같은 기간' : '전월', ...compareTotals(compareSummary, prevSummary) };
+            const yearComparison = { label: isCurrentMonth ? '전년 같은 기간' : '전년 같은 달', ...compareTotals(compareSummary, lastYearSummary) };
             const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
             const descriptionSummary = summarizeDescriptions(transactions, {
                 previousTransactions,
-                comparisonLabel: '전월 대비'
+                comparisonLabel: `${monthComparison.label} 대비`
             });
 
             monthlyTableBody.innerHTML = '';
@@ -1904,14 +2005,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setText('monthAvgSales', summary.averageSales.toLocaleString() + " 원");
             setText('monthAvgTicket', summary.averageTicket.toLocaleString() + " 원");
-            setTrendValue('monthCompareSales', comparison);
+            setTrendValue('monthCompareSales', yearComparison);
             setText('monthMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay.substring(5)}일 (${summary.maxSales.toLocaleString()}원)` : '-');
             setText('monthCashRatio', formatPercent(summary.cashRatio));
             setText('monthOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
             setText('monthlyDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
+            const currentLabel = isCurrentMonth ? '이번 달' : `${month}월`;
+            renderComparePanel('monthCompareList', [
+                { label: isCurrentMonth ? '이번 달 (오늘까지)' : `${year}년 ${month}월`, start: startDate, end: compareEnd, summary: compareSummary, kind: 'current' },
+                { label: monthComparison.label, start: prevStartDate, end: prevEndDate, summary: prevSummary, comparison: monthComparison },
+                { label: yearComparison.label, start: lastYearStart, end: lastYearCompareEnd, summary: lastYearSummary, comparison: yearComparison },
+                ...(isCurrentMonth ? [{
+                    label: `작년 ${month}월 전체`,
+                    start: lastYearStart,
+                    end: lastYearEnd,
+                    summary: summarizeDailyMap(lastYearDaily),
+                    kind: 'reference',
+                    note: '이번 달 마감 목표로 참고하세요.'
+                }] : [])
+            ], currentLabel);
             renderWeekdaySignals('monthWeekdaySignals', weekdaySummary);
             renderDescriptionRanking('monthDescriptionRanking', descriptionSummary);
-            renderInsightList('monthInsightList', createInsightMessages(summary, comparison, {
+            renderInsightList('monthInsightList', createInsightMessages(summary, [yearComparison, monthComparison], {
                 weekday: weekdaySummary,
                 descriptions: descriptionSummary
             }));
@@ -2232,19 +2347,28 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             setEmptyTableMessage(totalTableBody, 11, '기간 데이터를 종합 분석 중...');
 
-            const previousRange = getPreviousRange(startStr, endStr);
-            const { summaryRows, prevSummaryRows, transactions, previousTransactions } =
-                await fetchPeriodBundle(startStr, endStr, previousRange.startStr, previousRange.endStr);
+            // 아직 오지 않은 날짜는 비교에서 뺀다. (빈 날이 섞이면 늘 줄어든 것처럼 보인다)
+            const today = getKstToday();
+            const compareEnd = endStr > today && startStr <= today ? today : endStr;
+            const previousRange = getPreviousRange(startStr, compareEnd);
+            const lastYearRange = { startStr: shiftYearKey(startStr), endStr: shiftYearKey(compareEnd) };
+            const [{ summaryRows, prevSummaryRows, transactions, previousTransactions }, lastYearRows] = await Promise.all([
+                fetchPeriodBundle(startStr, endStr, previousRange.startStr, previousRange.endStr),
+                fetchDailySalesSummary(lastYearRange.startStr, lastYearRange.endStr)
+            ]);
             if (seq !== rangeLoadSeq) return;
 
             const dailySummary = buildDailySummaryFromView(startStr, endStr, summaryRows);
             const summary = summarizeDailyMap(dailySummary);
+            const compareSummary = summarizeDailyMap(pickDailyRange(dailySummary, startStr, compareEnd));
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(previousRange.startStr, previousRange.endStr, prevSummaryRows));
-            const comparison = compareTotals(summary, prevSummary);
+            const lastYearSummary = summarizeDailyMap(buildDailySummaryFromView(lastYearRange.startStr, lastYearRange.endStr, lastYearRows));
+            const periodComparison = { label: '직전 같은 길이 기간', ...compareTotals(compareSummary, prevSummary) };
+            const yearComparison = { label: '전년 같은 기간', ...compareTotals(compareSummary, lastYearSummary) };
             const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
             const descriptionSummary = summarizeDescriptions(transactions, {
                 previousTransactions,
-                comparisonLabel: '이전 기간 대비'
+                comparisonLabel: '직전 기간 대비'
             });
 
             totalTableBody.innerHTML = '';
@@ -2288,15 +2412,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setText('rangeAvgSales', summary.averageSales.toLocaleString() + " 원");
             setText('rangeAvgTicket', summary.averageTicket.toLocaleString() + " 원");
-            setTrendValue('rangeCompareSales', comparison);
+            setTrendValue('rangeCompareSales', yearComparison);
             setText('rangeMaxSalesDay', summary.maxSales > 0 ? `${summary.maxSalesDay} (${summary.maxSales.toLocaleString()}원)` : '-');
             setText('rangeCashRatio', formatPercent(summary.cashRatio));
             setText('rangeOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
-            setText('rangeChartMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatComparisonText(comparison)}`);
+            setText('rangeChartMeta', `${summary.operatingDays.toLocaleString()}영업일 · 전년 동기 ${formatComparisonText(yearComparison)}`);
             setText('rangeDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
+            renderComparePanel('rangeCompareList', [
+                { label: '선택 기간', start: startStr, end: compareEnd, summary: compareSummary, kind: 'current' },
+                { label: periodComparison.label, start: previousRange.startStr, end: previousRange.endStr, summary: prevSummary, comparison: periodComparison },
+                { label: yearComparison.label, start: lastYearRange.startStr, end: lastYearRange.endStr, summary: lastYearSummary, comparison: yearComparison }
+            ], '선택 기간');
             renderWeekdaySignals('rangeWeekdaySignals', weekdaySummary);
             renderDescriptionRanking('rangeDescriptionRanking', descriptionSummary);
-            renderInsightList('rangeInsightList', createInsightMessages(summary, comparison, {
+            renderInsightList('rangeInsightList', createInsightMessages(summary, [yearComparison, periodComparison], {
                 weekday: weekdaySummary,
                 descriptions: descriptionSummary
             }));

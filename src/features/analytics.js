@@ -277,10 +277,29 @@ export function summarizeDailyMap(dailySummary) {
   return totals;
 }
 
+// 두 기간의 매출을 비교한다. 영업일 수가 다르면 총액만으로는 오해하기 쉬워 영업일당 평균 비교도 함께 낸다.
 export function compareTotals(current, previous) {
   const diff = current.total - previous.total;
   const rate = previous.total > 0 ? (diff / previous.total) * 100 : null;
-  return { diff, rate };
+  const averageDiff = current.averageSales - previous.averageSales;
+  const averageRate = previous.averageSales > 0 ? (averageDiff / previous.averageSales) * 100 : null;
+  return {
+    diff,
+    rate,
+    averageDiff,
+    averageRate,
+    previousTotal: previous.total,
+    previousAverage: previous.averageSales,
+    operatingDays: current.operatingDays,
+    previousOperatingDays: previous.operatingDays
+  };
+}
+
+// 영업일 수가 눈에 띄게 다르면(2일 이상이면서 20% 이상) 총액 비교보다 영업일당 평균이 실제 흐름에 가깝다.
+export function hasOperatingDayGap(comparison) {
+  if (!comparison || comparison.operatingDays === 0 || comparison.previousOperatingDays === 0) return false;
+  const gap = Math.abs(comparison.operatingDays - comparison.previousOperatingDays);
+  return gap >= 2 && gap / Math.max(comparison.operatingDays, comparison.previousOperatingDays) >= 0.2;
 }
 
 export function summarizeWeekdayPerformance(dailySummary, transactions = []) {
@@ -678,7 +697,8 @@ export function analyzeSalesFlow(dailySummary) {
   };
 }
 
-export function createInsightMessages(summary, comparison = null, signals = {}) {
+// comparisons: [{ label: '전년 같은 기간', ...compareTotals() }] - 앞에 있을수록 중요한 비교다.
+export function createInsightMessages(summary, comparisons = [], signals = {}) {
   const messages = [];
 
   if (summary.operatingDays === 0) {
@@ -687,14 +707,19 @@ export function createInsightMessages(summary, comparison = null, signals = {}) 
 
   messages.push(`영업일 평균 매출은 ${summary.averageSales.toLocaleString()}원, 객단가는 ${summary.averageTicket.toLocaleString()}원입니다.`);
 
+  comparisons.filter((comparison) => comparison?.rate !== null && comparison?.rate !== undefined).forEach((comparison) => {
+    const direction = comparison.diff >= 0 ? '증가' : '감소';
+    let message = `${comparison.label} 대비 매출이 ${Math.abs(Math.round(comparison.rate)).toLocaleString()}% ${direction}했습니다.`;
+    if (hasOperatingDayGap(comparison) && comparison.averageRate !== null) {
+      const averageDirection = comparison.averageDiff >= 0 ? '높습니다' : '낮습니다';
+      message += ` 다만 영업일이 ${comparison.previousOperatingDays}일 → ${comparison.operatingDays}일로 달라, 영업일당 평균으로 보면 ${Math.abs(Math.round(comparison.averageRate)).toLocaleString()}% ${averageDirection}.`;
+    }
+    messages.push(message);
+  });
+
   if (summary.expense > 0) {
     const expenseRatio = summary.total > 0 ? Math.round((summary.expense / summary.total) * 100) : 0;
     messages.push(`현금 지출은 매출 대비 약 ${expenseRatio}% 수준입니다.`);
-  }
-
-  if (comparison && comparison.rate !== null) {
-    const direction = comparison.diff >= 0 ? '증가' : '감소';
-    messages.push(`이전 기간 대비 매출이 ${Math.abs(Math.round(comparison.rate)).toLocaleString()}% ${direction}했습니다.`);
   }
 
   if (signals.descriptions?.top) {
@@ -727,5 +752,5 @@ export function createInsightMessages(summary, comparison = null, signals = {}) 
     messages.push('현금 결제 비중이 높습니다. 현금 지출과 순현금 잔액을 함께 보는 구성이 유효합니다.');
   }
 
-  return messages.slice(0, 6);
+  return messages.slice(0, 7);
 }

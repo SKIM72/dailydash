@@ -868,6 +868,27 @@ html[data-theme="dark"] .entry-preview-item { background: var(--md-surface-conta
 .range-fields__sep { color: var(--md-on-surface-variant); font-weight: 700; }
 .range-presets { margin: 0; }
 
+/* 기간 비교: 같은 날짜 범위끼리 매출 · 영업일당 평균을 나란히 본다 */
+.compare-panel__note { font-size: 0.75rem; color: var(--md-on-surface-variant); text-align: right; }
+.compare-list { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.compare-row { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.875rem 1rem; border-radius: var(--shape-md); background: var(--md-surface-container-low); border: 1px solid transparent; }
+html[data-theme="dark"] .compare-row { background: var(--md-surface-container); }
+.compare-row--current { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+html[data-theme="dark"] .compare-row--current { background: var(--md-primary-container); }
+.compare-row--reference { background: transparent; border: 1px dashed var(--md-outline-variant); }
+html[data-theme="dark"] .compare-row--reference { background: transparent; }
+.compare-row__head { display: flex; flex-direction: column; gap: 0.125rem; }
+.compare-row__head strong { font-size: 0.9375rem; font-weight: 800; }
+.compare-row__head small { font-size: 0.75rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.compare-row__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.compare-stat { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.compare-stat small { font-size: 0.75rem; opacity: 0.75; }
+.compare-stat b { font-size: 1.0625rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.compare-delta { align-self: flex-start; margin-top: 0.125rem; padding: 0.125rem 0.5rem; border-radius: var(--shape-full); font-size: 0.75rem; font-weight: 700; background: var(--md-surface-container-high); color: var(--md-on-surface-variant); white-space: nowrap; }
+.compare-delta.is-positive { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.compare-delta.is-negative { background: var(--md-error-container); color: var(--md-on-error-container); }
+.compare-row__note { font-size: 0.75rem; color: var(--md-on-surface-variant); }
+
 .insight-panel { --tone: var(--md-primary); }
 .insight-panel ul { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
 .insight-panel li { position: relative; padding: 0.625rem 0.875rem 0.625rem 2.25rem; border-radius: var(--shape-md); background: var(--md-surface-container-low); font-size: 0.875rem; line-height: 1.55; word-break: keep-all; }
