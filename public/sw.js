@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v35-header';
+const CACHE_NAME = 'dailydash-v36-nav-motion';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

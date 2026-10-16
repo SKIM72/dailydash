@@ -1769,7 +1769,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // 메뉴 순서상 오른쪽으로 가면 앞으로, 왼쪽이면 뒤로 미끄러진다.
             const direction = VIEW_ORDER.indexOf(tabName) > VIEW_ORDER.indexOf(previousView) ? 'forward' : 'back';
-            runViewTransition(applyView, { direction, target: VIEWS[tabName].el });
+            runViewTransition(applyView, { direction, targets: [VIEWS[tabName].el, document.querySelector('.top-app-bar__titles')] });
         }
 
         if (tabName === 'daily') {

@@ -221,25 +221,25 @@ export function installNavIndicators(root = document) {
 }
 
 /* ---------------- 화면 전환 효과 ---------------- */
-// View Transitions 를 지원하면 이전/새 화면을 부드럽게 교차시키고, 아니면 새 화면에 등장 애니메이션만 준다.
-export function runViewTransition(update, { direction = 'forward', target = null } = {}) {
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const root = document.documentElement;
-  root.dataset.navDirection = direction;
-  if (!reduceMotion && typeof document.startViewTransition === 'function') {
-    // view-transition-name 은 새 쌓임 순서를 만들어 바텀시트 같은 겹침 요소를 가리므로, 전환하는 동안에만 붙인다.
-    root.classList.add('is-view-transitioning');
-    const transition = document.startViewTransition(() => update());
-    transition.finished.finally(() => root.classList.remove('is-view-transitioning'));
-    return;
-  }
+// 메뉴를 바꾸면 새 화면이 진행 방향에서 살짝 떠오르며 나타난다. (Material "fade through")
+// 화면 전체를 캡처하는 View Transitions API 는 하단 메뉴바·상단 바 같은 고정 요소를 가리고
+// 선택 표시가 미끄러지는 움직임도 감추므로 쓰지 않고, 실제 요소에 CSS 애니메이션만 준다.
+export function runViewTransition(update, { direction = 'forward', targets = [] } = {}) {
+  document.documentElement.dataset.navDirection = direction;
   update();
-  if (!reduceMotion && target) {
-    target.classList.remove('view-enter');
-    void target.offsetWidth;
-    target.classList.add('view-enter');
-    target.addEventListener('animationend', () => target.classList.remove('view-enter'), { once: true });
-  }
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  targets.filter(Boolean).forEach((element) => {
+    element.classList.remove('view-enter');
+    void element.offsetWidth; // 연달아 눌러도 애니메이션을 처음부터 다시 재생한다.
+    element.classList.add('view-enter');
+    const onEnd = (event) => {
+      // 안쪽 요소(탭 패널 등)의 animationend 는 무시한다.
+      if (event.target !== element) return;
+      element.classList.remove('view-enter');
+      element.removeEventListener('animationend', onEnd);
+    };
+    element.addEventListener('animationend', onEnd);
+  });
 }
 
 /* ---------------- 탭 ---------------- */

@@ -1078,28 +1078,17 @@ button.text-link { padding: 0.25rem 0.375rem; border-radius: var(--shape-xs); }
 .tx-list .empty-state { margin: 0 1rem 1rem; }
 .tx-card .tx-list { padding-bottom: 0.25rem; }
 
-/* 5-6. 화면 전환 효과
-   메뉴를 바꾸면 새 화면이 진행 방향으로 살짝 밀려 들어오고, 제목은 부드럽게 교차된다.
-   (View Transitions 를 지원하지 않는 브라우저는 .view-enter 애니메이션으로 대체) */
-.is-view-transitioning .view:not(.hidden-view) { view-transition-name: page; }
-.is-view-transitioning .top-app-bar__titles { view-transition-name: page-title; }
-::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-::view-transition-group(page) { animation: none; }
-::view-transition-old(page) { animation: page-out 0.16s var(--ease) both; }
-::view-transition-new(page) { animation: page-in 0.38s var(--ease-emphasized) both; }
-html[data-nav-direction="back"]::view-transition-old(page) { animation-name: page-out-back; }
-html[data-nav-direction="back"]::view-transition-new(page) { animation-name: page-in-back; }
-::view-transition-old(page-title) { animation: title-out 0.14s var(--ease) both; }
-::view-transition-new(page-title) { animation: title-in 0.3s var(--ease-emphasized) both; }
-.view.view-enter { animation: page-in 0.38s var(--ease-emphasized) both; }
+/* 5-6. 화면 전환 효과 (Material "fade through")
+   메뉴를 바꾸면 새 화면이 진행 방향에서 살짝 떠오르며 나타나고, 제목도 함께 바뀐다.
+   하단 메뉴바·상단 바는 그대로 보여 선택 표시가 미끄러지는 모습이 끊기지 않는다.
+   fill-mode 를 backwards 로 두어 끝난 뒤 transform 이 남지 않게 한다. (바텀시트 등 고정 요소 보호) */
+.view.view-enter { animation: page-in 0.3s var(--ease-emphasized) backwards; }
 html[data-nav-direction="back"] .view.view-enter { animation-name: page-in-back; }
+.top-app-bar__titles.view-enter { animation: title-in 0.24s var(--ease-emphasized) backwards; }
 .tab-panel:not([hidden]) { animation: panel-in 0.28s var(--ease-emphasized) both; }
-@keyframes page-in { from { opacity: 0; transform: translateX(2rem); } }
-@keyframes page-out { to { opacity: 0; transform: translateX(-1.25rem); } }
-@keyframes page-in-back { from { opacity: 0; transform: translateX(-2rem); } }
-@keyframes page-out-back { to { opacity: 0; transform: translateX(1.25rem); } }
-@keyframes title-in { from { opacity: 0; transform: translateY(0.375rem); } }
-@keyframes title-out { to { opacity: 0; transform: translateY(-0.375rem); } }
+@keyframes page-in { from { opacity: 0.25; transform: translateX(0.875rem); } }
+@keyframes page-in-back { from { opacity: 0.25; transform: translateX(-0.875rem); } }
+@keyframes title-in { from { opacity: 0; transform: translateY(0.25rem); } }
 @keyframes panel-in { from { opacity: 0; transform: translateY(0.5rem); } }
 
 /* 5-7. 로그인 화면 브랜드 */
@@ -1289,7 +1278,6 @@ html[data-theme="dark"] .install-steps li { background: var(--md-surface-contain
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-    ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
 @media print {
