@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DailyDash - 로그인</title>
-    
-    <link rel="manifest" href="manifest.json">
+
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DailyDash">
-    <link rel="apple-touch-icon" href="icon.jpeg">
-    
-    <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/icon.jpeg">
+
+    <link rel="icon" href="/favicon.png" type="image/png">
     <script>
         (() => {
             const key = 'dailydash-theme-preference';
@@ -31,30 +31,30 @@
         })();
     </script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="login-body-wrapper">
 
     <div class="login-card">
-        <img src="icon.jpeg" alt="DailyDash 로고" class="login-logo">
-        <div class="login-version" data-app-version>v0.6.0</div>
-        
+        <img src="/icon.jpeg" alt="DailyDash 로고" class="login-logo">
+        <div class="login-version" data-app-version>v0.7.0</div>
+
         <div id="login-view">
             <h2>DailyDash 로그인</h2>
             <p class="login-subtitle">가게 정산 시스템 접속을 위해 인증해 주세요.</p>
-            
+
             <form id="loginForm">
                 <div class="form-group" style="text-align: left;">
                     <label for="loginEmail"><i class="far fa-envelope"></i> 이메일 주소</label>
-                    <input type="email" id="loginEmail" placeholder="example@email.com" required>
+                    <input type="email" id="loginEmail" placeholder="example@email.com" autocomplete="username" required>
                 </div>
-                
+
                 <div class="form-group" style="text-align: left; margin-bottom: 12px;">
                     <label for="loginPassword"><i class="fas fa-lock"></i> 비밀번호</label>
                     <div class="password-input-wrap">
-                        <input type="password" id="loginPassword" placeholder="••••••••" required>
-                        <i class="fas fa-eye toggle-password" onclick="togglePassword('loginPassword', this)"></i>
+                        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
+                        <button type="button" class="toggle-password" data-toggle-password="loginPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
                     </div>
                 </div>
 
@@ -62,94 +62,110 @@
                     <label class="remember-me">
                         <input type="checkbox" id="rememberEmail"> 아이디 저장
                     </label>
-                    <a class="text-link" onclick="toggleView('reset')">비밀번호 찾기</a>
+                    <button type="button" class="text-link" data-view="reset">비밀번호 찾기</button>
                 </div>
-                
+
                 <button type="submit" class="btn-submit" id="loginBtn" style="margin-bottom: 20px;">
                     <i class="fas fa-sign-in-alt"></i> 로그인하기
                 </button>
             </form>
             <div style="font-size: 0.9rem; color: var(--text-muted);">
-                아직 계정이 없으신가요? <a class="text-link" onclick="toggleView('signup')">회원가입</a>
+                아직 계정이 없으신가요? <button type="button" class="text-link" data-view="signup">회원가입</button>
             </div>
         </div>
 
         <div id="signup-view" class="hidden-view">
             <h2>관리자 회원가입</h2>
             <p class="login-subtitle">새로운 DailyDash 계정을 생성합니다.</p>
-            
+
             <form id="signupForm">
                 <div class="form-group" style="text-align: left;">
                     <label for="signupEmail"><i class="far fa-envelope"></i> 사용할 이메일</label>
-                    <input type="email" id="signupEmail" placeholder="example@email.com" required>
+                    <input type="email" id="signupEmail" placeholder="example@email.com" autocomplete="username" required>
                 </div>
-                
+
                 <div class="form-group" style="text-align: left;">
-                    <label for="signupPassword"><i class="fas fa-lock"></i> 비밀번호 (6자 이상)</label>
+                    <label for="signupPassword"><i class="fas fa-lock"></i> 비밀번호 (8자 이상)</label>
                     <div class="password-input-wrap">
-                        <input type="password" id="signupPassword" placeholder="••••••••" required minlength="6">
-                        <i class="fas fa-eye toggle-password" onclick="togglePassword('signupPassword', this)"></i>
+                        <input type="password" id="signupPassword" placeholder="••••••••" autocomplete="new-password" required minlength="8">
+                        <button type="button" class="toggle-password" data-toggle-password="signupPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
                     </div>
                 </div>
 
                 <div class="form-group" style="text-align: left; margin-bottom: 24px;">
                     <label for="signupConfirmPassword"><i class="fas fa-check-circle"></i> 비밀번호 확인</label>
                     <div class="password-input-wrap">
-                        <input type="password" id="signupConfirmPassword" placeholder="••••••••" required minlength="6">
-                        <i class="fas fa-eye toggle-password" onclick="togglePassword('signupConfirmPassword', this)"></i>
+                        <input type="password" id="signupConfirmPassword" placeholder="••••••••" autocomplete="new-password" required minlength="8">
+                        <button type="button" class="toggle-password" data-toggle-password="signupConfirmPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
                     </div>
                 </div>
-                
+
                 <button type="submit" class="btn-submit" id="signupBtn" style="margin-bottom: 20px;">
                     <i class="fas fa-user-plus"></i> 가입하기
                 </button>
             </form>
             <div style="font-size: 0.9rem; color: var(--text-muted);">
-                이미 계정이 있으신가요? <a class="text-link" onclick="toggleView('login')">로그인으로 돌아가기</a>
+                이미 계정이 있으신가요? <button type="button" class="text-link" data-view="login">로그인으로 돌아가기</button>
             </div>
         </div>
 
         <div id="reset-view" class="hidden-view">
             <h2>비밀번호 찾기</h2>
-            <p class="login-subtitle">가입하신 이메일로 비밀번호 재설정 링크를 보내드립니다.</p>
-            
+            <p class="login-subtitle" id="resetSubtitle">가입하신 이메일로 비밀번호 재설정 링크를 보내드립니다.</p>
+
+            <div id="resetDisabledNotice" class="auth-notice hidden-view">
+                <i class="fas fa-user-shield"></i>
+                <p>이 서버는 메일 발송이 꺼져 있습니다.<br>관리자에게 <strong>비밀번호 초기화</strong>를 요청하면 임시 비밀번호를 받을 수 있습니다.</p>
+            </div>
+
             <form id="resetForm">
                 <div class="form-group" style="text-align: left; margin-bottom: 24px;">
                     <label for="resetEmail"><i class="far fa-envelope"></i> 가입한 이메일 주소</label>
-                    <input type="email" id="resetEmail" placeholder="example@email.com" required>
+                    <input type="email" id="resetEmail" placeholder="example@email.com" autocomplete="username" required>
                 </div>
-                
+
                 <button type="submit" class="btn-submit" id="resetBtn" style="margin-bottom: 20px;">
                     <i class="fas fa-paper-plane"></i> 재설정 링크 발송
                 </button>
             </form>
             <div style="font-size: 0.9rem; color: var(--text-muted);">
-                <a class="text-link" onclick="toggleView('login')"><i class="fas fa-arrow-left"></i> 로그인으로 돌아가기</a>
+                <button type="button" class="text-link" data-view="login"><i class="fas fa-arrow-left"></i> 로그인으로 돌아가기</button>
             </div>
         </div>
 
         <div id="update-password-view" class="hidden-view">
             <h2>새 비밀번호 설정</h2>
             <p class="login-subtitle">새롭게 사용할 비밀번호를 입력해 주세요.</p>
-            
+
             <form id="updatePasswordForm">
-                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
-                    <label for="newPassword"><i class="fas fa-lock"></i> 새 비밀번호</label>
+                <div class="form-group" style="text-align: left;">
+                    <label for="newPassword"><i class="fas fa-lock"></i> 새 비밀번호 (8자 이상)</label>
                     <div class="password-input-wrap">
-                        <input type="password" id="newPassword" placeholder="••••••••" required minlength="6">
-                        <i class="fas fa-eye toggle-password" onclick="togglePassword('newPassword', this)"></i>
+                        <input type="password" id="newPassword" placeholder="••••••••" autocomplete="new-password" required minlength="8">
+                        <button type="button" class="toggle-password" data-toggle-password="newPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
                     </div>
                 </div>
-                
+
+                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+                    <label for="newPasswordConfirm"><i class="fas fa-check-circle"></i> 새 비밀번호 확인</label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="newPasswordConfirm" placeholder="••••••••" autocomplete="new-password" required minlength="8">
+                        <button type="button" class="toggle-password" data-toggle-password="newPasswordConfirm" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn-submit" id="updatePwdBtn" style="background: var(--secondary); margin-bottom: 20px;">
                     <i class="fas fa-save"></i> 비밀번호 변경하기
                 </button>
             </form>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">
+                <button type="button" class="text-link" data-view="login"><i class="fas fa-arrow-left"></i> 로그인으로 돌아가기</button>
+            </div>
         </div>
     </div>
 
     <div id="custom-alert-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card">
+        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="alert-message">
             <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
             <h3 id="alert-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
             <button id="alert-ok-btn" class="btn-submit" style="margin-top: 0;">확인</button>
@@ -157,7 +173,7 @@
     </div>
 
     <div id="custom-confirm-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card">
+        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message">
             <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
             <h3 id="confirm-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
             <div style="display: flex; gap: 1rem; justify-content: center;">
@@ -167,24 +183,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        function toggleView(viewName) {
-            document.getElementById('login-view').classList.add('hidden-view');
-            document.getElementById('signup-view').classList.add('hidden-view');
-            document.getElementById('reset-view').classList.add('hidden-view');
-            document.getElementById('update-password-view').classList.add('hidden-view');
-            document.getElementById(viewName + '-view').classList.remove('hidden-view');
-        }
-        function togglePassword(inputId, icon) {
-            const input = document.getElementById(inputId);
-            if (input.type === 'password') {
-                input.type = 'text'; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); 
-            } else {
-                input.type = 'password'; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); 
-            }
-        }
-    </script>
     <script type="module" src="/src/auth.js"></script>
 </body>
 </html>

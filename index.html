@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DailyDash - 매출 일계표</title>
     
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DailyDash">
-    <link rel="apple-touch-icon" href="icon.jpeg">
+    <link rel="apple-touch-icon" href="/icon.jpeg">
     
-    <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="icon" href="/favicon.png" type="image/png">
     <script>
         (() => {
             const key = 'dailydash-theme-preference';
@@ -32,22 +32,17 @@
     </script>
     
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="/src/guard.js"></script>
 </head>
 <body>
     <div class="app-container">
         <header class="header">
             <div class="logo-title">
-                <img src="icon.jpeg" alt="DailyDash 로고" class="header-icon">
+                <img src="/icon.jpeg" alt="DailyDash 로고" class="header-icon">
                 <div class="brand-copy">
                     <h1>DailyDash</h1>
-                    <span class="version-badge" data-app-version>v0.6.0</span>
+                    <span class="version-badge" data-app-version>v0.7.0</span>
                 </div>
             </div>
             
@@ -72,17 +67,23 @@
             <section class="input-section">
                 <div class="date-picker-wrap" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
                     <label style="margin-bottom: 0;"><i class="far fa-calendar-alt"></i> 기준일 선택</label>
-                    <div class="custom-date-picker">
-                        <i class="far fa-calendar-check calendar-icon"></i>
-                        <span id="dateDisplay">날짜 선택</span>
-                        <input type="date" id="currentDate" required>
+                    <div class="date-nav">
+                        <button type="button" class="date-nav-btn" id="prevDayBtn" aria-label="전날" title="전날 (Alt+←)"><i class="fas fa-chevron-left"></i></button>
+                        <div class="custom-date-picker">
+                            <i class="far fa-calendar-check calendar-icon"></i>
+                            <span id="dateDisplay">날짜 선택</span>
+                            <input type="date" id="currentDate" required aria-label="기준일">
+                        </div>
+                        <button type="button" class="date-nav-btn" id="nextDayBtn" aria-label="다음날" title="다음날 (Alt+→)"><i class="fas fa-chevron-right"></i></button>
+                        <button type="button" class="date-nav-btn date-nav-today" id="todayBtn">오늘</button>
                     </div>
                 </div>
 
                 <div class="section-header">
-                    <h2><i class="fas fa-plus-circle"></i> 내역 추가</h2>
+                    <h2 id="transactionFormTitle"><i class="fas fa-plus-circle"></i> 내역 추가</h2>
+                    <button type="button" id="cancelEditBtn" class="btn-cancel-edit hidden-view"><i class="fas fa-xmark"></i> 수정 취소</button>
                 </div>
-                
+
                 <form id="transactionForm">
                     <div class="form-group">
                         <label for="desc">적요 (현금 & 카드)</label>
@@ -180,7 +181,10 @@
                 </div>
                 
                 <div class="daily-note-section">
-                    <label for="dailyNote"><i class="fas fa-thumbtack"></i> 일일 특기사항</label>
+                    <div class="note-label-row">
+                        <label for="dailyNote"><i class="fas fa-thumbtack"></i> 일일 특기사항</label>
+                        <span id="noteStatus" class="note-status" aria-live="polite"></span>
+                    </div>
                     <textarea id="dailyNote" rows="3" placeholder="오늘의 특기사항을 입력하세요 (예: 콩 수확)"></textarea>
                     <button id="saveNoteBtn" class="btn-secondary"><i class="fas fa-save"></i> 특기사항 저장</button>
                 </div>
@@ -271,6 +275,14 @@
                         </div>
                         <button id="loadTotalBtn" class="btn-submit" style="margin-top:0; width:auto; padding: 11px 20px; border-radius:12px;"><i class="fas fa-search"></i> 조회하기</button>
                     </div>
+                </div>
+                <div class="range-presets" role="group" aria-label="빠른 기간 선택">
+                    <button type="button" class="range-preset-btn" data-range-preset="thisMonth">이번 달</button>
+                    <button type="button" class="range-preset-btn" data-range-preset="lastMonth">지난 달</button>
+                    <button type="button" class="range-preset-btn" data-range-preset="last7">최근 7일</button>
+                    <button type="button" class="range-preset-btn" data-range-preset="last30">최근 30일</button>
+                    <button type="button" class="range-preset-btn" data-range-preset="last90">최근 90일</button>
+                    <button type="button" class="range-preset-btn" data-range-preset="thisYear">올해</button>
                 </div>
 
                 <div class="summary-cards stats-primary-grid">
@@ -387,12 +399,13 @@
     </div>
 
     <div id="myPageModal" class="modal-overlay hidden-view">
-        <div class="input-section" style="width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; position: relative;">
-            <span id="closeMyPage" style="position: absolute; top: 15px; right: 20px; font-size: 1.4rem; cursor: pointer; color: var(--text-muted);"><i class="fas fa-times"></i></span>
-            <div class="section-header" style="margin-bottom: 20px;"><h2><i class="fas fa-user-circle"></i> 마이페이지</h2></div>
+        <div class="input-section modal-panel" role="dialog" aria-modal="true" aria-labelledby="myPageTitle" style="width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; position: relative;">
+            <button type="button" id="closeMyPage" class="modal-close-btn" aria-label="닫기"><i class="fas fa-times"></i></button>
+            <div class="section-header" style="margin-bottom: 20px;"><h2 id="myPageTitle"><i class="fas fa-user-circle"></i> 마이페이지</h2></div>
             <div class="form-group" style="background: var(--side-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 24px;">
                 <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;"><i class="fas fa-id-badge"></i> 현재 로그인된 계정</label>
                 <span id="loggedInEmail" style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); display: block;">조회 중...</span>
+                <span id="loggedInRole" class="role-badge">-</span>
             </div>
             <div class="theme-setting-panel">
                 <label><i class="fas fa-circle-half-stroke"></i> 화면 모드</label>
@@ -404,24 +417,43 @@
             </div>
             <div class="app-version-panel">
                 <span>앱 버전</span>
-                <strong data-app-version>v0.6.0</strong>
-                <small>릴리스 <span data-app-release-date>2026.06.05</span> · 운영 안정성 보강</small>
+                <strong data-app-version>v0.7.0</strong>
+                <small>릴리스 <span data-app-release-date>2026.10.16</span> · 자체 서버 전환</small>
             </div>
+            <details class="password-change-panel">
+                <summary><i class="fas fa-key"></i> 비밀번호 변경</summary>
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label for="currentPasswordInput">현재 비밀번호</label>
+                        <input type="password" id="currentPasswordInput" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPasswordInput">새 비밀번호 (8자 이상)</label>
+                        <input type="password" id="newPasswordInput" autocomplete="new-password" minlength="8" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPasswordConfirmInput">새 비밀번호 확인</label>
+                        <input type="password" id="newPasswordConfirmInput" autocomplete="new-password" minlength="8" required>
+                    </div>
+                    <button type="submit" id="changePasswordBtn" class="btn-submit"><i class="fas fa-check"></i> 비밀번호 변경</button>
+                    <p class="panel-hint">변경하면 이 기기를 제외한 다른 기기에서는 다시 로그인해야 합니다.</p>
+                </form>
+            </details>
             <div class="operation-history-panel">
                 <div class="operation-history-header">
-                    <strong><i class="fas fa-clock-rotate-left"></i> 작업 이력</strong>
-                    <button type="button" id="clearOperationHistoryBtn"><i class="fas fa-trash-can"></i> 비우기</button>
+                    <strong><i class="fas fa-clock-rotate-left"></i> <span id="operationHistoryTitle">내 작업 이력</span></strong>
+                    <button type="button" id="refreshOperationHistoryBtn"><i class="fas fa-rotate-right"></i> 새로고침</button>
                 </div>
                 <div id="operationHistoryList" class="operation-history-list">
                     <p class="operation-history-empty">아직 기록된 작업이 없습니다.</p>
                 </div>
             </div>
             <div id="superUserPanel" class="hidden-view">
-                <div class="section-header" style="margin-top: 10px; margin-bottom: 12px;"><h2 style="font-size: 1.05rem; border-bottom-color: var(--secondary);"><i class="fas fa-user-shield" style="color: var(--secondary);"></i> 회원가입 승인 대기 명단</h2></div>
-                <div class="table-container" style="max-height: 220px; overflow-y: auto; margin-bottom: 0;">
-                    <table style="min-width: 100%;">
-                        <thead><tr><th style="padding: 10px; font-size: 0.8rem;">신청 이메일</th><th style="padding: 10px; text-align: center; font-size: 0.8rem;">작업</th></tr></thead>
-                        <tbody id="approvalListBody"><tr><td colspan="2" class="empty-msg" style="padding: 20px !important;">대기 중인 계정이 없습니다.</td></tr></tbody>
+                <div class="section-header" style="margin-top: 10px; margin-bottom: 12px;"><h2 style="font-size: 1.05rem; border-bottom-color: var(--secondary);"><i class="fas fa-user-shield" style="color: var(--secondary);"></i> 사용자 관리</h2></div>
+                <div class="table-container" style="max-height: 320px; overflow-y: auto; margin-bottom: 0;">
+                    <table class="user-table">
+                        <thead><tr><th>이메일</th><th>상태</th><th>작업</th></tr></thead>
+                        <tbody id="approvalListBody"><tr><td colspan="3" class="empty-msg" style="padding: 20px !important;">사용자 목록을 불러오는 중...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -429,10 +461,11 @@
     </div>
 
     <div id="dailyDetailModal" class="modal-overlay hidden-view" style="z-index: 9999;">
-        <div class="input-section" style="width: 100%; max-width: 720px; max-height: 85vh; overflow-y: auto; position: relative; padding: 28px;">
-            <span id="closeDetailModal" style="position: absolute; top: 18px; right: 22px; font-size: 1.4rem; cursor: pointer; color: var(--text-muted);"><i class="fas fa-times"></i></span>
+        <div class="input-section modal-panel" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle" style="width: 100%; max-width: 720px; max-height: 85vh; overflow-y: auto; position: relative; padding: 28px;">
+            <button type="button" id="closeDetailModal" class="modal-close-btn" aria-label="닫기"><i class="fas fa-times"></i></button>
             <div class="section-header" style="margin-bottom: 16px;">
-                <h2><i class="fas fa-info-circle"></i> <span id="detailModalTitleDate">0000-00-00</span> 건별 상세 내역 명세</h2>
+                <h2 id="detailModalTitle"><i class="fas fa-info-circle"></i> <span id="detailModalTitleDate">0000-00-00</span> 건별 상세 내역 명세</h2>
+                <button type="button" id="detailGoToDayBtn" class="btn-cancel-edit"><i class="fas fa-pen-to-square"></i> 이 날짜 입력 화면으로</button>
             </div>
             <div class="table-container" style="margin-bottom: 0;">
                 <table>
@@ -448,7 +481,7 @@
     </div>
 
     <div id="custom-alert-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card">
+        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="alert-message">
             <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
             <h3 id="alert-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
             <button id="alert-ok-btn" class="btn-submit" style="margin-top: 0;">확인</button>
@@ -456,7 +489,7 @@
     </div>
 
     <div id="custom-confirm-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card">
+        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message">
             <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
             <h3 id="confirm-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
             <div style="display: flex; gap: 1rem; justify-content: center;">

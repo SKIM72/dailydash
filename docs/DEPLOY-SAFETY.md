@@ -1,7 +1,13 @@
 # DailyDash 운영 반영 체크리스트
 
-1. Supabase에서 `transactions`, `daily_notes`, `user_approvals`를 먼저 백업합니다.
-2. 운영 배포 전에는 새 작업본으로 로그인, 조회, 입력, 소프트 삭제, 엑셀 다운로드를 각각 한 번씩 검증합니다.
-3. 프론트엔드에서는 삭제 보관 데이터를 물리 삭제하지 않습니다.
-4. Supabase RLS 정책에서 승인 사용자만 `transactions`와 `daily_notes`에 접근 가능한지 확인합니다.
-5. 운영 배포 후 서비스워커 캐시가 남아 있으면 브라우저 새로고침 또는 앱 재설치를 안내합니다.
+1. 반영 전에 DB 를 백업합니다.
+   `docker compose exec backup sh -c 'pg_dump --no-owner | gzip > /backups/dailydash-before-deploy.sql.gz'`
+2. 운영 반영 전에는 내 PC(또는 테스트 서버)에서 로그인, 조회, 입력, 수정, 삭제·되돌리기, 엑셀 다운로드를 각각 한 번씩 검증합니다.
+   GitHub 에 push 하면 `CI` 워크플로가 빌드와 서버 기동을 자동으로 검사하니 초록색인지 확인합니다.
+3. 정산 내역은 화면에서도 서버에서도 물리 삭제하지 않습니다. (`deleted_at` 보관 → 되돌리기 가능)
+4. 권한은 서버가 검사합니다. 수정·삭제·복원·사용자 관리·엑셀 백업 이력은 관리자(`role = admin`)만 가능하며,
+   승인되지 않은(`pending`)·사용 중지된(`disabled`) 계정은 어떤 데이터에도 접근할 수 없습니다.
+5. 반영 후 `docker compose ps` 로 app 이 `healthy` 인지, `docker compose logs --tail 50 app` 에 오류가 없는지 확인합니다.
+6. 서비스워커 캐시가 남아 옛 화면이 보이면 새로고침 또는 앱 재설치를 안내합니다.
+
+전체 운영 방법은 [SERVER-SETUP.md](SERVER-SETUP.md) 를 참고하세요.

@@ -1,0 +1,56 @@
+name: CI
+
+# push / PR 마다 화면 빌드와 서버 기동(실제 Postgres 연결)을 검사한다.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: dailydash
+          POSTGRES_USER: dailydash
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dailydash -d dailydash"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://dailydash:ci-password@127.0.0.1:5432/dailydash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Build web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Start server and smoke test
+        working-directory: server
+        run: |
+          npm ci --omit=dev
+          node scripts/create-admin.js ci-admin@example.com ci-password-123
+          PORT=3000 HOST=127.0.0.1 node src/index.js &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000/api/health && break; sleep 1; done
+          curl -fsS -c /tmp/jar -H 'Content-Type: application/json' \
+            -d '{"email":"ci-admin@example.com","password":"ci-password-123"}' http://127.0.0.1:3000/api/auth/login
+          curl -fsS -b /tmp/jar "http://127.0.0.1:3000/api/summary/daily?start=2026-01-01&end=2026-01-31"
+          curl -fsS http://127.0.0.1:3000/login.html -o /dev/null

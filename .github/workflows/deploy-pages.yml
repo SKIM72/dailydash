@@ -1,5 +1,9 @@
 name: Deploy DailyDash to GitHub Pages
 
+# 화면(HTML/JS)은 GitHub Pages 에서, 데이터는 집 서버 API 에서 받아온다.
+# 필요한 설정: GitHub 저장소 → Settings → Secrets and variables → Actions → Variables
+#   API_BASE_URL = 집 서버 API 주소 (예: https://175.201.61.141)
+
 on:
   push:
     branches:
@@ -18,7 +22,20 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
     steps:
+      - name: Check API address
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::error::저장소 Variables 에 API_BASE_URL(집 서버 API 주소)을 먼저 등록하세요."
+            exit 1
+          fi
+          case "$VITE_API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::API_BASE_URL 은 https:// 로 시작해야 합니다. (GitHub Pages 는 https 라서 http API 는 브라우저가 차단)"; exit 1 ;;
+          esac
+
       - name: Checkout
         uses: actions/checkout@v4
 

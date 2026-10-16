@@ -1,0 +1,22 @@
+# 같은 서버의 다른 프로젝트가 운영하는 리버스 프록시(Caddy)를 통해 HTTPS 를 받을 때 덧붙이는 설정.
+#
+# DailyDash 의 app 컨테이너만 그 프록시의 Docker 네트워크에 'dailydash-app' 이라는 이름으로 참여한다.
+# (DB 와 백업 컨테이너는 DailyDash 전용 네트워크에만 있어 다른 프로젝트에서 보이지 않는다)
+# 프록시 설정에는 `reverse_proxy dailydash-app:3000` 한 줄로 연결하면 된다.
+#
+# 사용법 (.env):
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.shared-proxy.yml
+#   PROXY_NETWORK=neulremote_default
+
+services:
+  app:
+    networks:
+      default: {}
+      shared-proxy:
+        aliases:
+          - dailydash-app
+
+networks:
+  shared-proxy:
+    name: ${PROXY_NETWORK:?.env 에 PROXY_NETWORK(연결할 프록시의 Docker 네트워크 이름)를 설정하세요}
+    external: true

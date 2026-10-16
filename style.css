@@ -1489,3 +1489,158 @@ tbody tr:hover { background-color: var(--row-hover-bg); }
 .clickable-row:active {
     transform: scale(0.995);
 }
+
+/* ========================================== */
+/* v0.7.0 자체 서버 전환 + UX 개선 컴포넌트      */
+/* ========================================== */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* 로그인 화면: 링크처럼 보이는 버튼, 비밀번호 보기 버튼 */
+button.text-link { background: none; border: none; padding: 0; font-size: inherit; font-family: inherit; }
+button.toggle-password { background: none; border: none; padding: 4px; display: inline-flex; align-items: center; }
+.auth-notice {
+    display: flex; gap: 12px; align-items: flex-start; text-align: left;
+    background: var(--insight-bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 20px; color: var(--text-main); font-size: 0.9rem; line-height: 1.55;
+}
+.auth-notice i { color: var(--primary); font-size: 1.2rem; margin-top: 2px; }
+
+/* 기준일 이동 (전날 / 다음날 / 오늘) */
+.date-nav { display: flex; align-items: center; gap: 6px; width: 100%; max-width: 420px; }
+.date-nav .custom-date-picker { flex: 1; min-width: 0; padding: 12px; }
+.date-nav .custom-date-picker span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.date-nav .custom-date-picker .calendar-icon { margin-right: 8px; }
+.date-nav-btn {
+    flex-shrink: 0; min-width: 40px; height: 46px; padding: 0 10px; border-radius: 12px;
+    background: var(--main-bg); border: 1px solid var(--border); color: var(--text-main);
+    font-weight: 700; cursor: pointer; transition: all 0.15s ease; box-shadow: var(--shadow-sm);
+}
+.date-nav-btn:hover { border-color: var(--primary); color: var(--primary); }
+.date-nav-today { font-size: 0.9rem; }
+
+/* 기간 빠른 선택 */
+.range-presets { display: flex; gap: 8px; flex-wrap: wrap; margin: -6px 0 16px; }
+.range-preset-btn {
+    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--quick-border);
+    background: var(--quick-bg); color: var(--primary); font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    transition: all 0.15s ease;
+}
+.range-preset-btn:hover { background: var(--quick-bg-hover); border-color: var(--quick-border-hover); }
+.range-preset-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* 내역 수정 모드 */
+.btn-cancel-edit {
+    padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--side-bg);
+    color: var(--text-muted); font-size: 0.85rem; font-weight: 700; cursor: pointer;
+}
+.btn-cancel-edit:hover { color: var(--text-main); border-color: var(--text-muted); }
+#transactionForm.is-editing { border-left: 3px solid #f59e0b; padding-left: 14px; margin-left: -17px; }
+#transactionForm.is-editing .btn-submit { background: #f59e0b; }
+#transactionForm.is-editing .btn-submit:hover { background: #d97706; }
+.row-actions { display: inline-flex; gap: 6px; }
+.btn-edit {
+    background: var(--side-bg); color: var(--text-main); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; transition: 0.2s;
+}
+.btn-edit:hover { border-color: var(--primary); color: var(--primary); }
+tbody tr.is-editing { background: rgba(245, 158, 11, 0.12) !important; box-shadow: inset 3px 0 0 #f59e0b; }
+
+/* 특기사항 저장 상태 */
+.note-label-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.note-status { font-size: 0.78rem; font-weight: 700; color: var(--secondary); }
+.note-status.is-dirty { color: #d97706; }
+#saveNoteBtn.is-attention { border-color: #f59e0b; color: #b45309; }
+html[data-theme="dark"] #saveNoteBtn.is-attention { color: #fbbf24; }
+
+/* 확인창 '저장/승인' 같은 일반 동작 버튼 */
+.btn-confirm-primary { background: var(--primary); color: #fff; cursor: pointer; transition: 0.2s; }
+.btn-confirm-primary:hover { background: var(--primary-hover); }
+
+/* 모달 공통 닫기 버튼 */
+.modal-close-btn {
+    position: absolute; top: 14px; right: 16px; width: 36px; height: 36px; border-radius: 10px;
+    background: transparent; color: var(--text-muted); font-size: 1.25rem; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.modal-close-btn:hover { background: var(--side-bg); color: var(--text-main); }
+.modal-panel .section-header { padding-right: 40px; }
+
+/* 마이페이지: 역할 배지, 비밀번호 변경, 이력 새로고침 */
+.role-badge {
+    display: inline-flex; align-items: center; margin-top: 6px; padding: 2px 8px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 800; background: var(--side-bg); color: var(--text-muted); border: 1px solid var(--border);
+    width: fit-content;
+}
+.role-badge.is-admin { background: var(--success-soft-bg); color: var(--secondary); border-color: transparent; }
+.password-change-panel {
+    margin-bottom: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--side-bg);
+}
+.password-change-panel summary {
+    cursor: pointer; padding: 12px 16px; font-weight: 800; font-size: 0.92rem; color: var(--text-main); list-style: none;
+}
+.password-change-panel summary::-webkit-details-marker { display: none; }
+.password-change-panel summary i { color: var(--primary); margin-right: 6px; }
+.password-change-panel form { padding: 0 16px 16px; }
+.password-change-panel label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.password-change-panel input {
+    padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--main-bg); color: var(--text-main); font-size: 16px; font-family: inherit;
+}
+.password-change-panel input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+.panel-hint { margin-top: 8px; font-size: 0.78rem; color: var(--text-muted); }
+.operation-history-header button:hover { color: var(--primary); border-color: var(--primary); }
+
+/* 관리자: 사용자 관리 표 */
+.user-table { min-width: 100%; }
+.user-table th, .user-table td { padding: 10px; font-size: 0.85rem; }
+.user-table td { white-space: normal; }
+.user-status-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 800; white-space: nowrap;
+}
+.user-status-badge.status-pending { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+.user-status-badge.status-approved { background: var(--success-soft-bg); color: var(--secondary); }
+.user-status-badge.status-disabled { background: var(--side-bg); color: var(--text-muted); border: 1px solid var(--border); }
+html[data-theme="dark"] .user-status-badge.status-pending { color: #fbbf24; }
+.user-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.user-action-btn {
+    padding: 5px 9px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    border: 1px solid var(--border); background: var(--main-bg); color: var(--text-main);
+}
+.user-action-btn.is-approve { background: var(--secondary); border-color: var(--secondary); color: #fff; }
+.user-action-btn.is-danger { color: var(--danger); }
+.user-action-btn:hover { border-color: var(--primary); }
+
+/* 토스트 알림 */
+.toast-container {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100000;
+    display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none;
+    width: min(92vw, 440px);
+}
+.toast {
+    pointer-events: auto; display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 12px 14px; border-radius: 12px; background: #0f172a; color: #f8fafc;
+    box-shadow: 0 12px 30px -12px rgb(0 0 0 / 0.45); font-size: 0.92rem; font-weight: 600;
+    animation: toastIn 0.18s ease-out;
+}
+html[data-theme="dark"] .toast { background: #f8fafc; color: #0f172a; }
+.toast i { font-size: 1.05rem; }
+.toast-success i { color: #34d399; }
+.toast-danger i { color: #f87171; }
+.toast-info i { color: #60a5fa; }
+html[data-theme="dark"] .toast-success i { color: #059669; }
+html[data-theme="dark"] .toast-info i { color: #2563eb; }
+.toast-message { flex: 1; min-width: 0; word-break: keep-all; }
+.toast-action {
+    background: transparent; color: #93c5fd; font-weight: 800; font-size: 0.88rem; cursor: pointer;
+    padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+}
+html[data-theme="dark"] .toast-action { color: #1d4ed8; }
+.toast-action:hover { background: rgb(255 255 255 / 0.1); }
+.toast.is-leaving { opacity: 0; transform: translateY(6px); transition: all 0.2s ease; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 768px) {
+    .date-nav { max-width: none; }
+    #transactionForm.is-editing { margin-left: -12px; padding-left: 9px; }
+    .toast-container { bottom: 16px; }
+}

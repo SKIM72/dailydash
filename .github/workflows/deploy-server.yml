@@ -1,0 +1,46 @@
+name: Deploy to my server
+
+# main 에 push 하면 서버에 SSH 로 접속해 최신 코드로 다시 띄운다. (선택 기능)
+# 켜는 법: GitHub 저장소 → Settings → Secrets and variables → Actions
+#   Variables : DEPLOY_ENABLED = true
+#   Secrets   : SERVER_HOST(도메인 또는 IP), SERVER_USER, SERVER_SSH_KEY(개인키), SERVER_PORT(선택, 기본 22)
+#               DEPLOY_PATH(선택, 서버의 dailydash 폴더 경로. 기본 ~/dailydash)
+# 자세한 내용: docs/SERVER-SETUP.md
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and rebuild on server
+        uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: DEPLOY_PATH
+          script: |
+            set -e
+            cd "${DEPLOY_PATH:-$HOME/dailydash}"
+            git pull --ff-only
+            # dailydash 프로젝트만 다시 띄운다. 같은 서버의 다른 프로젝트에 영향을 주는 prune 등은 쓰지 않는다.
+            docker compose up -d --build
+            for i in $(seq 1 30); do
+              docker compose exec -T app wget -qO- http://127.0.0.1:3000/api/health && exit 0
+              sleep 2
+            done
+            echo "배포 후 헬스체크 실패" >&2
+            docker compose logs --tail 50 app
+            exit 1

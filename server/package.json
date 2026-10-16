@@ -1,0 +1,22 @@
+{
+  "name": "dailydash-server",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "create-admin": "node scripts/create-admin.js",
+    "migrate:supabase": "node scripts/migrate-from-supabase.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express": "^5.3.0",
+    "nodemailer": "^10.1.1",
+    "pg": "^8.23.1"
+  }
+}

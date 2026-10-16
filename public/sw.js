@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v29-ops-safety';
+const CACHE_NAME = 'dailydash-v30-selfhost';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -21,6 +21,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+  // 정산 데이터(API)는 항상 서버에서 새로 받는다. 캐시된 옛 숫자를 보여주지 않기 위함.
+  if (url.pathname.startsWith('/api/')) return;
 
   event.respondWith(
     fetch(event.request)

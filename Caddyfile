@@ -1,0 +1,24 @@
+# DOMAIN(.env)에 적은 주소로 Let's Encrypt HTTPS 인증서를 자동 발급/갱신한다.
+# - 도메인(예: mydash.duckdns.org)도, 공인 IP(예: 175.201.61.141)도 쓸 수 있다.
+# - IP 인증서는 Let's Encrypt 'shortlived'(6일) 프로필로만 발급되며, Caddy 가 알아서 갱신한다.
+{
+	# IP 로 접속하면 브라우저가 서버 이름(SNI)을 보내지 않으므로 어떤 인증서를 쓸지 지정한다.
+	default_sni {$DOMAIN}
+}
+
+{$DOMAIN} {
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	reverse_proxy app:3000
+}

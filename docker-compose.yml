@@ -1,0 +1,129 @@
+# DailyDash 자체 서버 구성
+#   app    : API + 웹 화면 (Node.js)
+#   db     : PostgreSQL (데이터는 pgdata 볼륨에 영구 저장)
+#   backup : 매일 DB 백업 (./backups 폴더, BACKUP_KEEP_DAYS 일 보관)
+#   caddy  : (선택, profile "caddy") 이 서버의 80/443 을 DailyDash 가 단독으로 쓸 때만 켠다
+#   duckdns: (선택, profile "duckdns") DuckDNS 주소 자동 갱신
+#
+# 다른 프로젝트와 같은 서버에서 돌 때를 위한 격리 원칙
+#   - 프로젝트 이름을 dailydash 로 고정 → 컨테이너/네트워크/볼륨이 모두 dailydash_ 로 분리된다
+#   - DB 포트는 밖으로 열지 않고, 앱은 서버 내부(127.0.0.1)에만 연다
+#   - 메모리 상한을 둬서 다른 프로젝트의 자원을 뺏지 않는다
+#
+# 실행:  docker compose up -d --build
+# 상세 안내: docs/SERVER-SETUP.md
+
+name: dailydash
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      POSTGRES_DB: dailydash
+      POSTGRES_USER: dailydash
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env 에 POSTGRES_PASSWORD 를 설정하세요}
+      TZ: Asia/Seoul
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dailydash -d dailydash"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    mem_limit: 256m
+    depends_on:
+      db:
+        condition: service_healthy
+    # 서버에 이미 있는 리버스 프록시(Caddy 등)가 이 포트로 DailyDash 에 연결한다. 외부에는 열리지 않는다.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_HOST_PORT:-3780}:3000"
+    environment:
+      DATABASE_URL: postgres://dailydash:${POSTGRES_PASSWORD}@db:5432/dailydash
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      APP_URL: ${APP_URL:-https://${DOMAIN:?.env 에 DOMAIN 을 설정하세요}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      TZ: Asia/Seoul
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["caddy"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: dailydash
+      PGDATABASE: dailydash
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      TZ: Asia/Seoul
+    volumes:
+      # DB 와 다른 디스크에 두면 디스크 고장에도 백업이 남는다 (.env 의 BACKUP_DIR)
+      - ${BACKUP_DIR:-./backups}:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 120  # 첫 기동 시 앱이 테이블을 만든 뒤에 백업하도록 잠시 대기
+        while true; do
+          file="/backups/dailydash-$$(date +%Y%m%d-%H%M).sql.gz"
+          if pg_dump --no-owner | gzip > "$$file.tmp"; then
+            mv "$$file.tmp" "$$file"
+            echo "[backup] 생성: $$file"
+          else
+            rm -f "$$file.tmp"
+            echo "[backup] 실패" >&2
+          fi
+          find /backups -name 'dailydash-*.sql.gz' -mtime +$$BACKUP_KEEP_DAYS -delete
+          sleep 86400
+        done
+
+  duckdns:
+    image: curlimages/curl:8.11.1
+    profiles: ["duckdns"]
+    restart: unless-stopped
+    mem_limit: 32m
+    environment:
+      DUCKDNS_SUBDOMAIN: ${DUCKDNS_SUBDOMAIN:-}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          result=$$(curl -fsS "https://www.duckdns.org/update?domains=$${DUCKDNS_SUBDOMAIN}&token=$${DUCKDNS_TOKEN}&ip=")
+          echo "[duckdns] $$(date '+%F %T') $$result"
+          sleep 300
+        done
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

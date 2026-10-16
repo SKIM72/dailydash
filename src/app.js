@@ -1,6 +1,7 @@
 import '../style.css';
-import { createSupabaseClient } from './services/supabaseClient.js';
-import { installModalHandlers } from './shared/modal.js';
+import { api, getCurrentUser } from './services/api.js';
+import { bindDismissibleModal, installModalHandlers } from './shared/modal.js';
+import { showToast } from './shared/toast.js';
 import { appendCell, setText } from './shared/dom.js';
 import { formatCommas, formatPercent, formatWon, parseCommas } from './shared/format.js';
 import { formatDateKey, getDayName, getKstToday, getPreviousMonth, parseDateKey } from './shared/date.js';
@@ -37,8 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
             navigator.serviceWorker.register('sw.js').then(reg => console.log('PWA OK:', reg.scope), err => console.log('PWA Fail:', err));
         });
     }
-    
-    const supabase = createSupabaseClient();
 
     // DOM 요소 캐싱
     const datePicker = document.getElementById('currentDate');
@@ -74,31 +73,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const myPageModal = document.getElementById('myPageModal');
     const closeMyPage = document.getElementById('closeMyPage');
     const loggedInEmail = document.getElementById('loggedInEmail');
+    const loggedInRole = document.getElementById('loggedInRole');
     const superUserPanel = document.getElementById('superUserPanel');
     const approvalListBody = document.getElementById('approvalListBody');
     const operationHistoryList = document.getElementById('operationHistoryList');
-    const clearOperationHistoryBtn = document.getElementById('clearOperationHistoryBtn');
+    const refreshOperationHistoryBtn = document.getElementById('refreshOperationHistoryBtn');
+    const changePasswordForm = document.getElementById('changePasswordForm');
 
     const downloadExcelBtn = document.getElementById('downloadExcelBtn');
     const logoutBtn = document.getElementById('logoutBtn');
+    const transactionFormTitle = document.getElementById('transactionFormTitle');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const noteStatus = document.getElementById('noteStatus');
 
     // 전역 차트 인스턴스 핸들 객체 (중복 생성 방지용)
     let trendChartInstance = null;
     let currentChartMode = 'sales';
     let lastTrendDailySummary = null;
+    let currentUser = null;
     let currentUserEmail = '';
-
-    const SUPER_ADMIN_EMAIL = 'eowert72@gmail.com';
-    const OPERATION_HISTORY_KEY = 'dailydash-operation-history';
+    // 관리자가 '수정'을 누른 내역. null 이면 새 내역 입력 모드.
+    let editingTransaction = null;
+    // 날짜를 빠르게 바꿀 때 늦게 도착한 이전 날짜 응답이 화면을 덮어쓰지 않도록 요청 순번을 둔다.
+    let dailyLoadSeq = 0;
+    let monthlyLoadSeq = 0;
+    let rangeLoadSeq = 0;
+    let savedNoteText = '';
+    let currentDailyDate = '';
+    let detailModalDate = '';
 
     if (!datePicker || !tabDaily || !tableBody) return;
 
-    function normalizeEmail(email) {
-        return String(email || '').trim().toLowerCase();
-    }
+    const myPageDialog = bindDismissibleModal(myPageModal, closeMyPage);
+    const detailDialog = bindDismissibleModal(document.getElementById('dailyDetailModal'), document.getElementById('closeDetailModal'));
 
     function isSuperAdmin() {
-        return normalizeEmail(currentUserEmail) === SUPER_ADMIN_EMAIL;
+        return currentUser?.role === 'admin';
     }
 
     function formatKstDateTime(value = new Date()) {
@@ -124,36 +134,31 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(value || 'backup').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_');
     }
 
-    function getOperationHistory() {
-        try {
-            const parsed = JSON.parse(localStorage.getItem(OPERATION_HISTORY_KEY) || '[]');
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
+    function renderHistoryMessage(text) {
+        const message = document.createElement('p');
+        message.className = 'operation-history-empty';
+        message.textContent = text;
+        operationHistoryList.replaceChildren(message);
     }
 
-    function saveOperationHistory(items) {
-        try {
-            localStorage.setItem(OPERATION_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
-        } catch {
-            // 저장 공간이 막힌 환경에서는 이력 표시만 생략한다.
-        }
-    }
-
-    function renderOperationHistory() {
+    // 작업 이력은 서버(audit_logs)에 남는다. 관리자는 전체, 일반 사용자는 본인 작업만 보인다.
+    async function loadOperationHistory() {
         if (!operationHistoryList) return;
-        const items = getOperationHistory();
-        operationHistoryList.replaceChildren();
-
-        if (!items.length) {
-            const empty = document.createElement('p');
-            empty.className = 'operation-history-empty';
-            empty.textContent = '아직 기록된 작업이 없습니다.';
-            operationHistoryList.appendChild(empty);
+        renderHistoryMessage('작업 이력을 불러오는 중...');
+        let items;
+        try {
+            items = await api.auditLogs(30);
+        } catch (err) {
+            renderHistoryMessage(`작업 이력을 불러오지 못했습니다. (${err.message})`);
             return;
         }
 
+        if (!items.length) {
+            renderHistoryMessage('아직 기록된 작업이 없습니다.');
+            return;
+        }
+
+        operationHistoryList.replaceChildren();
         items.forEach((item) => {
             const entry = document.createElement('article');
             entry.className = 'operation-history-item';
@@ -162,13 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
             head.className = 'operation-history-item-head';
 
             const label = document.createElement('strong');
-            label.textContent = item.label || item.type || '작업';
+            label.textContent = item.label || item.action || '작업';
             const type = document.createElement('span');
-            type.textContent = item.type || '작업';
+            type.textContent = item.action || '작업';
             head.append(label, type);
 
             const meta = document.createElement('small');
-            meta.textContent = `${formatKstDateTime(item.at)} · ${item.user || '계정 정보 없음'}`;
+            meta.textContent = `${formatKstDateTime(item.at)} · ${item.user_email || '시스템'}`;
 
             entry.append(head, meta);
             if (Array.isArray(item.details) && item.details.length) {
@@ -178,19 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             operationHistoryList.appendChild(entry);
         });
-    }
-
-    function logOperation(type, label, details = []) {
-        const items = getOperationHistory();
-        items.unshift({
-            at: new Date().toISOString(),
-            user: currentUserEmail || 'unknown',
-            type,
-            label,
-            details
-        });
-        saveOperationHistory(items);
-        renderOperationHistory();
     }
 
     function applySensitiveActionGuard() {
@@ -298,30 +290,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function fetchDailySalesSummary(startStr, endStr) {
-        const { data, error } = await supabase
-            .from('v_daily_sales_summary')
-            .select('transaction_date, row_count, total_people, total_cash, total_card, total_expense, total_sales, net_sales, average_ticket')
-            .gte('transaction_date', startStr)
-            .lte('transaction_date', endStr)
-            .order('transaction_date', { ascending: true });
-
-        if (error) throw error;
-        return data || [];
+    function fetchDailySalesSummary(startStr, endStr) {
+        return api.dailySummary(startStr, endStr);
     }
 
-    async function fetchTransactionsForRange(startStr, endStr) {
-        const { data, error } = await supabase
-            .from('transactions')
-            .select('transaction_date, description, customer_count, cash_income, cash_expense, card_income')
-            .gte('transaction_date', startStr)
-            .lte('transaction_date', endStr)
-            .is('deleted_at', null)
-            .order('transaction_date', { ascending: true })
-            .range(0, 4999);
+    function fetchTransactionsForRange(startStr, endStr) {
+        return api.listTransactionsInRange(startStr, endStr);
+    }
 
-        if (error) throw error;
-        return data || [];
+    // 기간 통계 화면에서 쓰는 4가지 데이터를 동시에 받아온다. (기존엔 순서대로 4번 기다렸음)
+    async function fetchPeriodBundle(startStr, endStr, prevStartStr, prevEndStr) {
+        const [summaryRows, prevSummaryRows, transactions, previousTransactions] = await Promise.all([
+            fetchDailySalesSummary(startStr, endStr),
+            fetchDailySalesSummary(prevStartStr, prevEndStr),
+            fetchTransactionsForRange(startStr, endStr),
+            fetchTransactionsForRange(prevStartStr, prevEndStr)
+        ]);
+        return { summaryRows, prevSummaryRows, transactions, previousTransactions };
+    }
+
+    function shiftDateKey(dateStr, days) {
+        const date = parseDateKey(dateStr);
+        date.setDate(date.getDate() + days);
+        return formatDateKey(date);
+    }
+
+    function setEmptyTableMessage(tbody, colspan, message, { tone = '' } = {}) {
+        const row = document.createElement('tr');
+        const cell = appendCell(row, message);
+        cell.colSpan = colspan;
+        cell.className = 'empty-msg';
+        if (tone === 'danger') cell.style.color = 'var(--danger)';
+        tbody.replaceChildren(row);
     }
 
     function renderInsightList(listId, messages) {
@@ -791,9 +791,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. 앱 초기화
     async function init() {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return; 
-        currentUserEmail = session.user.email || '';
+        try {
+            currentUser = await getCurrentUser();
+        } catch (err) {
+            if (err.status !== 401) await window.showAlert(`계정 정보를 확인하지 못했습니다.<br>${err.message}`);
+            return;
+        }
+        if (currentUser.status !== 'approved') {
+            await window.showAlert('아직 가입 승인이 완료되지 않은 계정입니다. 최고 관리자의 승인을 기다려주세요.');
+            await api.logout().catch(() => {});
+            window.location.replace('login.html');
+            return;
+        }
+        currentUserEmail = currentUser.email || '';
         applySensitiveActionGuard();
 
         // 운영 데이터 보호: 프론트엔드에서는 삭제 보관분을 물리 삭제하지 않는다.
@@ -815,15 +825,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 값 변경 시 날짜 글씨 실시간 업데이트 이벤트 연결
         datePicker.addEventListener('change', () => {
-            updateDateDisplay(datePicker.value);
-            loadDailyData(datePicker.value);
+            if (!datePicker.value) return;
+            changeDailyDate(datePicker.value);
+        });
+        document.getElementById('prevDayBtn')?.addEventListener('click', () => changeDailyDate(shiftDateKey(datePicker.value, -1)));
+        document.getElementById('nextDayBtn')?.addEventListener('click', () => changeDailyDate(shiftDateKey(datePicker.value, 1)));
+        document.getElementById('todayBtn')?.addEventListener('click', () => changeDailyDate(getKstToday()));
+        // Alt + ←/→ 로 하루씩 이동 (입력 중에도 동작)
+        document.addEventListener('keydown', (event) => {
+            if (!event.altKey || viewDaily.style.display === 'none') return;
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                changeDailyDate(shiftDateKey(datePicker.value, event.key === 'ArrowLeft' ? -1 : 1));
+            }
+        });
+        document.querySelectorAll('[data-range-preset]').forEach((button) => {
+            button.addEventListener('click', () => applyRangePreset(button.dataset.rangePreset));
+        });
+        cancelEditBtn?.addEventListener('click', () => exitEditMode({ resetForm: true }));
+        noteInput.addEventListener('input', updateNoteStatus);
+        window.addEventListener('beforeunload', (event) => {
+            if (isNoteDirty()) event.preventDefault();
+        });
+        document.getElementById('detailGoToDayBtn')?.addEventListener('click', () => {
+            if (!detailModalDate) return;
+            detailDialog.close();
+            switchTab('daily', { date: detailModalDate });
         });
         monthPicker.addEventListener('change', () => {
             updateMonthDisplay(monthPicker.value);
             loadMonthlyData(monthPicker.value);
         });
-        totalStartDate.addEventListener('change', () => updateGenericDateDisplay(totalStartDate, 'startDateDisplay', '시작일 선택'));
-        totalEndDate.addEventListener('change', () => updateGenericDateDisplay(totalEndDate, 'endDateDisplay', '종료일 선택'));
+        const clearRangePreset = () => {
+            document.querySelectorAll('[data-range-preset].active').forEach((button) => button.classList.remove('active'));
+        };
+        totalStartDate.addEventListener('change', () => {
+            updateGenericDateDisplay(totalStartDate, 'startDateDisplay', '시작일 선택');
+            clearRangePreset();
+        });
+        totalEndDate.addEventListener('change', () => {
+            updateGenericDateDisplay(totalEndDate, 'endDateDisplay', '종료일 선택');
+            clearRangePreset();
+        });
 
         tabDaily.addEventListener('click', () => switchTab('daily'));
         tabMonthly.addEventListener('click', () => switchTab('monthly'));
@@ -833,116 +876,285 @@ document.addEventListener('DOMContentLoaded', () => {
         if (downloadExcelBtn) downloadExcelBtn.addEventListener('click', () => downloadStyledExcel('monthlyTable', monthPicker.value));
         if (downloadTotalExcelBtn) downloadTotalExcelBtn.addEventListener('click', () => downloadStyledExcel('totalRangeTable', `${totalStartDate.value}_to_${totalEndDate.value}`));
         if (logoutBtn) logoutBtn.addEventListener('click', () => window.logout());
-        if (clearOperationHistoryBtn) {
-            clearOperationHistoryBtn.addEventListener('click', async () => {
-                if (!(await window.showConfirm('이 브라우저에 저장된 작업 이력을 비울까요?'))) return;
-                saveOperationHistory([]);
-                renderOperationHistory();
-            });
-        }
+        refreshOperationHistoryBtn?.addEventListener('click', () => loadOperationHistory());
+        changePasswordForm?.addEventListener('submit', handleChangePassword);
 
-        if (myPageBtn && myPageModal && closeMyPage) {
+        if (myPageBtn && myPageModal) {
             myPageBtn.addEventListener('click', () => {
                 loggedInEmail.textContent = currentUserEmail;
-                renderOperationHistory();
-                myPageModal.classList.remove('hidden-view');
+                if (loggedInRole) {
+                    loggedInRole.textContent = isSuperAdmin() ? '관리자' : '일반 사용자';
+                    loggedInRole.classList.toggle('is-admin', isSuperAdmin());
+                }
+                setText('operationHistoryTitle', isSuperAdmin() ? '전체 작업 이력' : '내 작업 이력');
+                myPageDialog.open();
+                loadOperationHistory();
                 if (isSuperAdmin()) {
                     superUserPanel.classList.remove('hidden-view');
-                    loadApprovalList();
+                    loadUserManagement();
                 } else {
                     superUserPanel.classList.add('hidden-view');
                 }
-            });
-            closeMyPage.addEventListener('click', () => myPageModal.classList.add('hidden-view'));
-        }
-
-        // 모달 닫기 바인딩 연동 추가
-        const closeDetailModal = document.getElementById('closeDetailModal');
-        if(closeDetailModal) {
-            closeDetailModal.addEventListener('click', () => {
-                document.getElementById('dailyDetailModal').classList.add('hidden-view');
             });
         }
 
         loadDailyData(today);
     }
 
-    async function loadApprovalList() {
+    async function changeDailyDate(dateStr) {
+        if (!dateStr || dateStr === currentDailyDate) {
+            datePicker.value = currentDailyDate;
+            return;
+        }
+        if (isNoteDirty()) {
+            const leave = await window.showConfirm(
+                '저장하지 않은 특기사항이 있습니다.\n저장하지 않고 다른 날짜로 이동할까요?',
+                { danger: true, confirmLabel: '이동' }
+            );
+            if (!leave) {
+                datePicker.value = currentDailyDate;
+                return;
+            }
+        }
+        if (editingTransaction) exitEditMode({ resetForm: true });
+        datePicker.value = dateStr;
+        updateDateDisplay(dateStr);
+        loadDailyData(dateStr);
+    }
+
+    function applyRangePreset(preset) {
+        const today = getKstToday();
+        const ranges = {
+            thisMonth: () => [`${today.slice(0, 7)}-01`, today],
+            lastMonth: () => {
+                const prev = getPreviousMonth(today.slice(0, 7));
+                const lastDay = new Date(Number(prev.slice(0, 4)), Number(prev.slice(5, 7)), 0).getDate();
+                return [`${prev}-01`, `${prev}-${String(lastDay).padStart(2, '0')}`];
+            },
+            last7: () => [shiftDateKey(today, -6), today],
+            last30: () => [shiftDateKey(today, -29), today],
+            last90: () => [shiftDateKey(today, -89), today],
+            thisYear: () => [`${today.slice(0, 4)}-01-01`, today]
+        };
+        const range = (ranges[preset] || ranges.thisMonth)();
+        totalStartDate.value = range[0];
+        totalEndDate.value = range[1];
+        updateGenericDateDisplay(totalStartDate, 'startDateDisplay', '시작일 선택');
+        updateGenericDateDisplay(totalEndDate, 'endDateDisplay', '종료일 선택');
+        document.querySelectorAll('[data-range-preset]').forEach((button) => {
+            button.classList.toggle('active', button.dataset.rangePreset === preset);
+        });
+        loadTotalRangeData();
+    }
+
+    async function handleChangePassword(event) {
+        event.preventDefault();
+        const currentPassword = document.getElementById('currentPasswordInput').value;
+        const newPassword = document.getElementById('newPasswordInput').value;
+        const confirmPassword = document.getElementById('newPasswordConfirmInput').value;
+        if (newPassword !== confirmPassword) {
+            await window.showAlert('새 비밀번호와 확인 값이 일치하지 않습니다.');
+            return;
+        }
+        const button = document.getElementById('changePasswordBtn');
+        button.disabled = true;
+        try {
+            await api.changePassword(currentPassword, newPassword);
+            changePasswordForm.reset();
+            changePasswordForm.closest('details')?.removeAttribute('open');
+            showToast('비밀번호를 변경했습니다.');
+            loadOperationHistory();
+        } catch (err) {
+            await window.showAlert(`비밀번호 변경 실패: ${err.message}`);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    const USER_STATUS_LABELS = { pending: '승인 대기', approved: '사용 중', disabled: '사용 중지' };
+
+    function createUserActionButton(label, iconClass, className, onClick) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `user-action-btn ${className}`;
+        const icon = document.createElement('i');
+        icon.className = `fas ${iconClass}`;
+        button.append(icon, ` ${label}`);
+        button.addEventListener('click', onClick);
+        return button;
+    }
+
+    async function loadUserManagement() {
         if (!approvalListBody) return;
         if (!isSuperAdmin()) {
-            approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg" style="padding: 20px !important;">관리자 전용 영역입니다.</td></tr>';
+            setEmptyTableMessage(approvalListBody, 3, '관리자 전용 영역입니다.');
             return;
         }
-        approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 대기 명단 구성 중...</td></tr>';
-        const { data: list, error } = await supabase.from('user_approvals').select('*').eq('is_approved', false).order('created_at', { ascending: true });
-        if (error) {
-            approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg" style="color:var(--danger);">데이터를 로드하지 못했습니다.</td></tr>';
+        setEmptyTableMessage(approvalListBody, 3, '사용자 목록을 불러오는 중...');
+        let users;
+        try {
+            users = await api.listUsers();
+        } catch (err) {
+            setEmptyTableMessage(approvalListBody, 3, `데이터를 로드하지 못했습니다. (${err.message})`, { tone: 'danger' });
             return;
         }
-        if (!list || list.length === 0) {
-            approvalListBody.innerHTML = '<tr><td colspan="2" class="empty-msg" style="padding: 20px !important;">대기 중인 신청 계정이 없습니다.</td></tr>';
+        if (!users.length) {
+            setEmptyTableMessage(approvalListBody, 3, '등록된 사용자가 없습니다.');
             return;
         }
-        approvalListBody.innerHTML = '';
-        list.forEach(item => {
+
+        approvalListBody.replaceChildren();
+        users.forEach((user) => {
             const row = document.createElement('tr');
-            appendCell(row, item.email, 'padding: 12px; font-weight: 500; text-align:left;');
-            const actionCell = appendCell(row, '', 'padding: 12px; text-align: center;');
-            const approveBtn = document.createElement('button');
-            approveBtn.className = 'btn-approve';
-            approveBtn.innerHTML = '<i class="fas fa-user-check"></i> 가입 승인';
-            approveBtn.addEventListener('click', () => window.approveUser(item.email));
-            actionCell.appendChild(approveBtn);
+            const emailCell = appendCell(row, user.email, 'font-weight: 500; text-align: left !important;');
+            if (user.role === 'admin') {
+                const badge = document.createElement('span');
+                badge.className = 'role-badge is-admin';
+                badge.textContent = '관리자';
+                emailCell.append(' ', badge);
+            }
+
+            const statusCell = appendCell(row, '');
+            const status = document.createElement('span');
+            status.className = `user-status-badge status-${user.status}`;
+            status.textContent = USER_STATUS_LABELS[user.status] || user.status;
+            statusCell.appendChild(status);
+
+            const actionCell = appendCell(row, '');
+            const actions = document.createElement('div');
+            actions.className = 'user-actions';
+            const isSelf = user.id === currentUser.id;
+
+            if (user.status !== 'approved') {
+                actions.appendChild(createUserActionButton('승인', 'fa-user-check', 'is-approve', () => approveUser(user)));
+            }
+            if (!isSelf && user.status === 'approved' && user.role !== 'admin') {
+                actions.appendChild(createUserActionButton('중지', 'fa-user-slash', 'is-muted', () => disableUser(user)));
+            }
+            if (!isSelf) {
+                actions.appendChild(createUserActionButton('비번 초기화', 'fa-key', 'is-muted', () => resetUserPassword(user)));
+            }
+            if (!isSelf && user.status !== 'approved') {
+                actions.appendChild(createUserActionButton(user.status === 'pending' ? '거절' : '삭제', 'fa-trash-can', 'is-danger', () => removeUser(user)));
+            }
+            if (isSelf) {
+                const selfNote = document.createElement('span');
+                selfNote.className = 'sensitive-locked';
+                selfNote.textContent = '본인 계정';
+                actions.appendChild(selfNote);
+            }
+            actionCell.appendChild(actions);
             approvalListBody.appendChild(row);
         });
     }
 
-    window.approveUser = async (targetEmail) => {
-        if (!isSuperAdmin()) {
-            await window.showAlert('회원 승인 처리는 관리자만 가능합니다.');
-            return;
+    async function runUserAction(action, successMessage) {
+        try {
+            const result = await action();
+            if (successMessage) showToast(successMessage);
+            loadUserManagement();
+            loadOperationHistory();
+            return result;
+        } catch (err) {
+            await window.showAlert(`처리 중 오류가 발생했습니다.<br>${err.message}`);
+            return null;
         }
+    }
+
+    async function approveUser(user) {
         const confirmMessage = [
             '회원가입 승인을 진행할까요?',
-            `대상 계정: ${targetEmail}`,
+            `대상 계정: ${user.email}`,
             '승인 후 DailyDash 정산 장부에 접속할 수 있습니다.'
         ].join('\n');
-        if (!(await window.showConfirm(confirmMessage))) return;
-        const { error } = await supabase.from('user_approvals').update({ is_approved: true }).eq('email', targetEmail);
-        if (error) { await window.showAlert("승인 처리 중 오류 발생: " + error.message); } 
-        else {
-            logOperation('회원 승인', targetEmail, ['DailyDash 접속 권한 승인']);
-            await window.showAlert(`${targetEmail} 계정의 정산 장부 접근 승인이 완료되었습니다.`);
-            loadApprovalList();
+        if (!(await window.showConfirm(confirmMessage, { danger: false, confirmLabel: '승인' }))) return;
+        await runUserAction(() => api.approveUser(user.id), `${user.email} 계정을 승인했습니다.`);
+    }
+
+    async function disableUser(user) {
+        const confirmMessage = [
+            '이 계정의 사용을 중지할까요?',
+            `대상 계정: ${user.email}`,
+            '모든 기기에서 즉시 로그아웃되며, 다시 승인하면 사용할 수 있습니다.'
+        ].join('\n');
+        if (!(await window.showConfirm(confirmMessage, { danger: true, confirmLabel: '사용 중지' }))) return;
+        await runUserAction(() => api.disableUser(user.id), `${user.email} 계정을 사용 중지했습니다.`);
+    }
+
+    async function resetUserPassword(user) {
+        const confirmMessage = [
+            '임시 비밀번호를 발급할까요?',
+            `대상 계정: ${user.email}`,
+            '기존 비밀번호는 즉시 사용할 수 없게 됩니다.'
+        ].join('\n');
+        if (!(await window.showConfirm(confirmMessage, { danger: true, confirmLabel: '발급' }))) return;
+        const result = await runUserAction(() => api.resetUserPassword(user.id));
+        if (result?.temporaryPassword) {
+            await window.showAlert([
+                `${user.email} 의 임시 비밀번호`,
+                result.temporaryPassword,
+                '이 창을 닫으면 다시 볼 수 없습니다. 사용자에게 전달하고, 로그인 후 마이페이지에서 비밀번호를 바꾸도록 안내해 주세요.'
+            ].join('\n'));
         }
-    };
+    }
+
+    async function removeUser(user) {
+        const isPending = user.status === 'pending';
+        const confirmMessage = [
+            isPending ? '가입 신청을 거절할까요?' : '이 계정을 삭제할까요?',
+            `대상 계정: ${user.email}`,
+            '삭제한 계정은 되돌릴 수 없습니다. (입력했던 정산 내역은 유지됩니다)'
+        ].join('\n');
+        if (!(await window.showConfirm(confirmMessage, { danger: true, confirmLabel: isPending ? '거절' : '삭제' }))) return;
+        await runUserAction(() => api.deleteUser(user.id), isPending ? '가입 신청을 거절했습니다.' : '계정을 삭제했습니다.');
+    }
+
+    function isNoteDirty() {
+        return noteInput.value !== savedNoteText;
+    }
+
+    function updateNoteStatus() {
+        if (!noteStatus) return;
+        const dirty = isNoteDirty();
+        noteStatus.textContent = dirty ? '저장되지 않은 변경' : (savedNoteText ? '저장됨' : '');
+        noteStatus.classList.toggle('is-dirty', dirty);
+        saveNoteBtn.classList.toggle('is-attention', dirty);
+    }
 
     async function loadDailyData(date) {
+        const seq = ++dailyLoadSeq;
+        const sameDate = date === currentDailyDate;
+        currentDailyDate = date;
+        setEmptyTableMessage(tableBody, 9, '데이터를 불러오는 중...');
         try {
-            tableBody.innerHTML = '<tr><td colspan="9" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 데이터를 불러오는 중...</td></tr>';
-            const { data: transactions, error: txError } = await supabase.from('transactions').select('*').eq('transaction_date', date).is('deleted_at', null).order('created_at', { ascending: true });
-            if (txError) throw txError;
+            const [transactions, note] = await Promise.all([
+                api.listTransactionsByDate(date),
+                api.getNote(date)
+            ]);
+            if (seq !== dailyLoadSeq) return;
 
-            const { data: note, error: noteError } = await supabase.from('daily_notes').select('special_note').eq('note_date', date).single();
-            if (noteError && noteError.code !== 'PGRST116') throw noteError;
-
-            renderDailyTable(transactions || []);
-            renderDailyQualityChecks(date, transactions || []);
-            noteInput.value = note ? note.special_note : '';
+            renderDailyTable(transactions);
+            renderDailyQualityChecks(date, transactions);
+            // 같은 날짜를 다시 불러올 때(입력 후 새로고침 등) 작성 중인 특기사항은 지우지 않는다.
+            const keepDraft = sameDate && isNoteDirty();
+            savedNoteText = note?.special_note || '';
+            if (!keepDraft) noteInput.value = savedNoteText;
+            updateNoteStatus();
         } catch (err) {
+            if (seq !== dailyLoadSeq) return;
             console.error(err);
-            tableBody.innerHTML = `<tr><td colspan="9" class="empty-msg" style="color: var(--danger);"><i class="fas fa-exclamation-circle"></i> 로드 실패 (${err.message})</td></tr>`;
+            setEmptyTableMessage(tableBody, 9, `로드 실패 (${err.message})`, { tone: 'danger' });
             renderDailyQualityError(err.message);
         }
     }
 
     function renderDailyTable(transactions) {
         if (transactions.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="9" class="empty-msg">아직 입력된 내역이 없습니다.</td></tr>';
+            setEmptyTableMessage(tableBody, 9, '아직 입력된 내역이 없습니다.');
             updateDailyTotals(0, 0, 0, 0);
             return;
         }
-        tableBody.innerHTML = '';
+        tableBody.replaceChildren();
         let tCount = 0, tCashIn = 0, tCashOut = 0, tCardIn = 0;
         transactions.forEach((tx, index) => {
             tCount += tx.customer_count || 0;
@@ -951,6 +1163,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tCardIn += tx.card_income || 0;
 
             const row = document.createElement('tr');
+            row.dataset.transactionId = tx.id;
+            if (editingTransaction?.id === tx.id) row.classList.add('is-editing');
             appendCell(row, index + 1);
             appendCell(row, tx.description || '', 'font-weight: 500;');
             appendCell(row, (tx.customer_count || 0).toLocaleString());
@@ -961,11 +1175,25 @@ document.addEventListener('DOMContentLoaded', () => {
             appendCell(row, tx.remark2 || '', 'color: var(--text-muted);');
             const actionCell = appendCell(row, '');
             if (isSuperAdmin()) {
+                const actions = document.createElement('div');
+                actions.className = 'row-actions';
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'btn-edit';
+                editBtn.innerHTML = '<i class="fas fa-pen"></i> 수정';
+                editBtn.setAttribute('aria-label', `${index + 1}번 내역 수정`);
+                editBtn.addEventListener('click', () => enterEditMode(tx, index + 1));
+
                 const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
                 deleteBtn.className = 'btn-danger';
                 deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> 삭제';
-                deleteBtn.addEventListener('click', () => window.deleteTransaction(tx));
-                actionCell.appendChild(deleteBtn);
+                deleteBtn.setAttribute('aria-label', `${index + 1}번 내역 삭제`);
+                deleteBtn.addEventListener('click', () => deleteTransaction(tx));
+
+                actions.append(editBtn, deleteBtn);
+                actionCell.appendChild(actions);
             } else {
                 const locked = document.createElement('span');
                 locked.className = 'sensitive-locked';
@@ -1105,12 +1333,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setDailyQualityState(hasDanger ? 'danger' : 'warning', `${issues.length.toLocaleString()}건 확인`, visibleIssues);
     }
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const date = datePicker.value;
-        const originalButtonHtml = submitTransactionBtn?.innerHTML;
-        const newTx = {
-            transaction_date: date,
+    const AMOUNT_INPUT_IDS = ['count', 'cashIn', 'cardIn', 'cashOut'];
+    const SUBMIT_IDLE_HTML = '<i class="fas fa-check"></i> 입력하기';
+    const SUBMIT_EDIT_HTML = '<i class="fas fa-floppy-disk"></i> 수정 저장';
+
+    function readTransactionForm() {
+        return {
+            transaction_date: editingTransaction?.transaction_date || datePicker.value,
             description: document.getElementById('desc').value.trim(),
             customer_count: parseCommas(document.getElementById('count').value),
             cash_income: parseCommas(document.getElementById('cashIn').value),
@@ -1119,55 +1348,118 @@ document.addEventListener('DOMContentLoaded', () => {
             remark1: document.getElementById('remark1').value.trim(),
             remark2: document.getElementById('remark2').value.trim()
         };
-        const summary = buildTransactionSummary(newTx);
-        const confirmMessage = [
-            '입력 내용을 저장할까요?',
-            `일자: ${newTx.transaction_date}`,
-            `적요: ${newTx.description || '미입력'}`,
-            `인원: ${summary.people.toLocaleString()}명`,
-            `총매출: ${formatWon(summary.sales)} (현금 ${formatWon(summary.cash)} / 카드 ${formatWon(summary.card)})`,
-            `현금 지출: ${formatWon(summary.expense)}`,
-            `비고: ${[newTx.remark1, newTx.remark2].filter(Boolean).join(' / ') || '없음'}`
-        ].join('\n');
+    }
 
-        if (!(await window.showConfirm(confirmMessage))) return;
+    function resetTransactionForm() {
+        form.reset();
+        AMOUNT_INPUT_IDS.forEach((id) => { document.getElementById(id).value = ''; });
+        updateEntryPreview();
+    }
 
-        if (submitTransactionBtn) {
-            submitTransactionBtn.disabled = true;
-            submitTransactionBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+    function enterEditMode(tx, rowNo) {
+        editingTransaction = tx;
+        document.getElementById('desc').value = tx.description || '';
+        document.getElementById('count').value = formatCommas(tx.customer_count || 0);
+        document.getElementById('cashIn').value = formatCommas(tx.cash_income || 0);
+        document.getElementById('cardIn').value = formatCommas(tx.card_income || 0);
+        document.getElementById('cashOut').value = formatCommas(tx.cash_expense || 0);
+        document.getElementById('remark1').value = tx.remark1 || '';
+        document.getElementById('remark2').value = tx.remark2 || '';
+        updateEntryPreview();
+
+        transactionFormTitle.innerHTML = '<i class="fas fa-pen-to-square"></i> ';
+        transactionFormTitle.append(`${rowNo}번 내역 수정`);
+        cancelEditBtn?.classList.remove('hidden-view');
+        form.classList.add('is-editing');
+        submitTransactionBtn.innerHTML = SUBMIT_EDIT_HTML;
+        tableBody.querySelectorAll('tr.is-editing').forEach((row) => row.classList.remove('is-editing'));
+        tableBody.querySelector(`tr[data-transaction-id="${tx.id}"]`)?.classList.add('is-editing');
+
+        form.closest('.input-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('desc').focus({ preventScroll: true });
+    }
+
+    function exitEditMode({ resetForm = false } = {}) {
+        editingTransaction = null;
+        transactionFormTitle.innerHTML = '<i class="fas fa-plus-circle"></i> 내역 추가';
+        cancelEditBtn?.classList.add('hidden-view');
+        form.classList.remove('is-editing');
+        submitTransactionBtn.innerHTML = SUBMIT_IDLE_HTML;
+        tableBody.querySelectorAll('tr.is-editing').forEach((row) => row.classList.remove('is-editing'));
+        if (resetForm) resetTransactionForm();
+    }
+
+    function describeChange(label, before, after, format = (value) => value) {
+        if (String(before ?? '') === String(after ?? '')) return null;
+        return `${label}: ${format(before) || '없음'} → ${format(after) || '없음'}`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (submitTransactionBtn?.disabled) return;
+        const editing = editingTransaction;
+        const values = readTransactionForm();
+        const summary = buildTransactionSummary(values);
+
+        let confirmMessage;
+        if (editing) {
+            const changes = [
+                describeChange('적요', editing.description, values.description),
+                describeChange('인원', editing.customer_count, values.customer_count, (v) => `${Number(v || 0).toLocaleString()}명`),
+                describeChange('현금 수입', editing.cash_income, values.cash_income, formatWon),
+                describeChange('카드 수입', editing.card_income, values.card_income, formatWon),
+                describeChange('현금 지출', editing.cash_expense, values.cash_expense, formatWon),
+                describeChange('비고 1', editing.remark1, values.remark1),
+                describeChange('비고 2', editing.remark2, values.remark2)
+            ].filter(Boolean);
+            if (!changes.length) {
+                showToast('바뀐 내용이 없습니다.', { tone: 'info' });
+                return;
+            }
+            confirmMessage = ['이 내역을 수정할까요?', `일자: ${values.transaction_date}`, ...changes].join('\n');
+        } else {
+            confirmMessage = [
+                '입력 내용을 저장할까요?',
+                `일자: ${values.transaction_date}`,
+                `적요: ${values.description || '미입력'}`,
+                `인원: ${summary.people.toLocaleString()}명`,
+                `총매출: ${formatWon(summary.sales)} (현금 ${formatWon(summary.cash)} / 카드 ${formatWon(summary.card)})`,
+                `현금 지출: ${formatWon(summary.expense)}`,
+                `비고: ${[values.remark1, values.remark2].filter(Boolean).join(' / ') || '없음'}`
+            ].join('\n');
         }
 
-        try {
-            const { error } = await supabase.from('transactions').insert([newTx]);
-            if (error) throw error;
+        if (!(await window.showConfirm(confirmMessage, { danger: false, confirmLabel: editing ? '수정' : '저장' }))) return;
 
-            form.reset();
-            ['count','cashIn','cardIn','cashOut'].forEach(id => document.getElementById(id).value = '');
-            updateEntryPreview();
-            await loadDailyData(date);
-            logOperation('내역 입력', summary.label, [
-                `총매출 ${formatWon(summary.sales)}`,
-                `인원 ${summary.people.toLocaleString()}명`
-            ]);
-            await window.showAlert("입력이 완료되었습니다.");
+        submitTransactionBtn.disabled = true;
+        submitTransactionBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+
+        try {
+            if (editing) {
+                await api.updateTransaction(editing.id, values);
+                exitEditMode({ resetForm: true });
+                showToast('내역을 수정했습니다.');
+            } else {
+                await api.createTransaction(values);
+                resetTransactionForm();
+                showToast(`입력 완료 · ${values.description} ${formatWon(summary.sales)}`);
+            }
+            await loadDailyData(values.transaction_date);
             document.getElementById('desc')?.focus();
         } catch (error) {
             await window.showAlert("저장 실패: " + error.message);
         } finally {
-            if (submitTransactionBtn) {
-                submitTransactionBtn.disabled = false;
-                submitTransactionBtn.innerHTML = originalButtonHtml || '<i class="fas fa-check"></i> 입력하기';
-            }
+            submitTransactionBtn.disabled = false;
+            submitTransactionBtn.innerHTML = editingTransaction ? SUBMIT_EDIT_HTML : SUBMIT_IDLE_HTML;
         }
     });
 
-    window.deleteTransaction = async (target) => {
+    async function deleteTransaction(tx) {
         if (!isSuperAdmin()) {
             await window.showAlert('내역 삭제는 관리자만 가능합니다.');
             return;
         }
 
-        const tx = typeof target === 'object' && target ? target : { id: target, transaction_date: datePicker.value };
         const summary = buildTransactionSummary(tx);
         const confirmMessage = [
             '이 내역을 삭제 처리할까요?',
@@ -1176,44 +1468,71 @@ document.addEventListener('DOMContentLoaded', () => {
             `인원: ${summary.people.toLocaleString()}명`,
             `총매출: ${formatWon(summary.sales)}`,
             `현금 지출: ${formatWon(summary.expense)}`,
-            '삭제된 내역은 화면에서 숨겨지고 deleted_at 값으로 보관됩니다.'
+            '삭제된 내역은 화면에서 숨겨지고 서버에 보관됩니다.'
         ].join('\n');
 
-        if (!(await window.showConfirm(confirmMessage))) return;
-        const { error } = await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).eq('id', tx.id);
-        if(!error) {
-            logOperation('내역 삭제', summary.label, [
-                `총매출 ${formatWon(summary.sales)}`,
-                `인원 ${summary.people.toLocaleString()}명`
-            ]);
-            await loadDailyData(datePicker.value);
-            await window.showAlert('삭제 처리되었습니다.');
+        if (!(await window.showConfirm(confirmMessage, { danger: true, confirmLabel: '삭제' }))) return;
+        try {
+            await api.deleteTransaction(tx.id);
+        } catch (error) {
+            await window.showAlert("삭제 실패: " + error.message);
+            return;
         }
-        else { await window.showAlert("삭제 실패: " + error.message); }
-    };
+        if (editingTransaction?.id === tx.id) exitEditMode({ resetForm: true });
+        await loadDailyData(datePicker.value);
+        showToast(`삭제했습니다 · ${tx.description || '적요 없음'}`, {
+            tone: 'info',
+            duration: 7000,
+            actionLabel: '되돌리기',
+            onAction: async () => {
+                try {
+                    await api.restoreTransaction(tx.id);
+                    showToast('삭제를 취소했습니다.');
+                    if (datePicker.value === tx.transaction_date) loadDailyData(datePicker.value);
+                } catch (error) {
+                    await window.showAlert("복원 실패: " + error.message);
+                }
+            }
+        });
+    }
 
     saveNoteBtn.addEventListener('click', async () => {
         const note = noteInput.value.trim();
+        const date = datePicker.value;
+        if (note === savedNoteText.trim()) {
+            showToast('바뀐 내용이 없습니다.', { tone: 'info' });
+            return;
+        }
         const confirmMessage = [
             '특기사항을 저장할까요?',
-            `일자: ${datePicker.value}`,
+            `일자: ${date}`,
             `내용 길이: ${note.length.toLocaleString()}자`
         ].join('\n');
-        if (!(await window.showConfirm(confirmMessage))) return;
-        const { error } = await supabase.from('daily_notes').upsert({ note_date: datePicker.value, special_note: noteInput.value });
-        if(!error) {
-            logOperation('특기사항 저장', datePicker.value, [`${note.length.toLocaleString()}자`]);
-            await window.showAlert("특기사항이 저장되었습니다.");
+        if (!(await window.showConfirm(confirmMessage, { danger: false, confirmLabel: '저장' }))) return;
+        saveNoteBtn.disabled = true;
+        try {
+            const saved = await api.saveNote(date, note);
+            if (date === currentDailyDate) {
+                savedNoteText = saved.special_note;
+                noteInput.value = savedNoteText;
+                updateNoteStatus();
+            }
+            showToast('특기사항을 저장했습니다.');
+        } catch (error) {
+            await window.showAlert("저장 실패: " + error.message);
+        } finally {
+            saveNoteBtn.disabled = false;
         }
-        else await window.showAlert("저장 실패: " + error.message);
     });
 
-    function switchTab(tabName) {
+    function switchTab(tabName, { date } = {}) {
         tabDaily.classList.remove('active'); tabMonthly.classList.remove('active'); if(tabTotal) tabTotal.classList.remove('active');
         viewDaily.style.display = 'none'; viewMonthly.style.display = 'none'; if(viewTotal) viewTotal.style.display = 'none';
 
         if (tabName === 'daily') {
-            tabDaily.classList.add('active'); viewDaily.style.display = 'flex'; loadDailyData(datePicker.value);
+            tabDaily.classList.add('active'); viewDaily.style.display = 'flex';
+            if (date && date !== currentDailyDate) changeDailyDate(date);
+            else loadDailyData(datePicker.value);
         } else if (tabName === 'monthly') {
             tabMonthly.classList.add('active'); viewMonthly.style.display = 'flex'; loadMonthlyData(monthPicker.value);
         } else if (tabName === 'total') {
@@ -1228,27 +1547,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const modalTableBody = document.getElementById('detailModalTableBody');
         
         if(!modal || !modalTableBody) return;
-        
-        titleDate.textContent = dateStr;
-        modalTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 해당 일자 세부 건별 명세 조회 중...</td></tr>';
-        modal.classList.remove('hidden-view');
-        
+
+        detailModalDate = dateStr;
+        titleDate.textContent = `${dateStr} (${getDayName(dateStr)})`;
+        setEmptyTableMessage(modalTableBody, 8, '해당 일자 세부 건별 명세 조회 중...');
+        detailDialog.open();
+
         try {
-            const { data: list, error } = await supabase
-                .from('transactions')
-                .select('*')
-                .eq('transaction_date', dateStr)
-                .is('deleted_at', null)
-                .order('created_at', { ascending: true });
-                
-            if(error) throw error;
-            
+            const list = await api.listTransactionsByDate(dateStr);
+            if (detailModalDate !== dateStr) return;
+
             if(!list || list.length === 0) {
-                modalTableBody.innerHTML = '<tr><td colspan="8" class="empty-msg">해당 일자에는 등록된 상세 판매 내역이 없습니다.</td></tr>';
+                setEmptyTableMessage(modalTableBody, 8, '해당 일자에는 등록된 상세 판매 내역이 없습니다.');
                 return;
             }
-            
-            modalTableBody.innerHTML = '';
+
+            modalTableBody.replaceChildren();
             list.forEach((tx, idx) => {
                 const row = document.createElement('tr');
                 appendCell(row, idx + 1);
@@ -1263,30 +1577,32 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (err) {
             console.error(err);
-            modalTableBody.innerHTML = `<tr><td colspan="8" class="empty-msg" style="color: var(--danger);">명세 로드 실패 (${err.message})</td></tr>`;
+            setEmptyTableMessage(modalTableBody, 8, `명세 로드 실패 (${err.message})`, { tone: 'danger' });
         }
     }
 
     async function loadMonthlyData(monthStr) {
+        if (!monthStr) return;
+        const seq = ++monthlyLoadSeq;
         try {
-            monthlyTableBody.innerHTML = '<tr><td colspan="11" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 데이터를 분석하는 중...</td></tr>';
+            setEmptyTableMessage(monthlyTableBody, 11, '데이터를 분석하는 중...');
             const startDate = `${monthStr}-01`;
             const lastDay = new Date(monthStr.split('-')[0], monthStr.split('-')[1], 0).getDate();
             const endDate = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
-
-            const summaryRows = await fetchDailySalesSummary(startDate, endDate);
-            const dailySummary = buildDailySummaryFromView(startDate, endDate, summaryRows);
-            const summary = summarizeDailyMap(dailySummary);
 
             const prevMonth = getPreviousMonth(monthStr);
             const prevLastDay = new Date(prevMonth.split('-')[0], prevMonth.split('-')[1], 0).getDate();
             const prevStartDate = `${prevMonth}-01`;
             const prevEndDate = `${prevMonth}-${String(prevLastDay).padStart(2, '0')}`;
-            const prevSummaryRows = await fetchDailySalesSummary(prevStartDate, prevEndDate);
+
+            const { summaryRows, prevSummaryRows, transactions, previousTransactions } =
+                await fetchPeriodBundle(startDate, endDate, prevStartDate, prevEndDate);
+            if (seq !== monthlyLoadSeq) return;
+
+            const dailySummary = buildDailySummaryFromView(startDate, endDate, summaryRows);
+            const summary = summarizeDailyMap(dailySummary);
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(prevStartDate, prevEndDate, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
-            const transactions = await fetchTransactionsForRange(startDate, endDate);
-            const previousTransactions = await fetchTransactionsForRange(prevStartDate, prevEndDate);
             const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
             const descriptionSummary = summarizeDescriptions(transactions, {
                 previousTransactions,
@@ -1354,14 +1670,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
 
         } catch (err) {
+            if (seq !== monthlyLoadSeq) return;
             console.error(err);
             setText('monthlyDetailMeta', '조회 실패');
-            monthlyTableBody.innerHTML = `<tr><td colspan="11" class="empty-msg" style="color: var(--danger);">통계 데이터를 불러오지 못했습니다.</td></tr>`;
+            setEmptyTableMessage(monthlyTableBody, 11, `통계 데이터를 불러오지 못했습니다. (${err.message})`, { tone: 'danger' });
         }
     }
 
+    // Chart.js 는 '총 통계' 탭에서만 필요하므로 처음 쓸 때 받아온다. (첫 화면 로딩을 가볍게)
+    let chartLibraryPromise = null;
+    function loadChartLibrary() {
+        chartLibraryPromise ||= import('chart.js/auto').then((module) => module.default);
+        return chartLibraryPromise;
+    }
+
+    function readCssVar(name, fallback) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+    }
+
     // 요구사항 2번: 트렌디한 통계 분석 처리를 위한 종합 시각화 및 요일 분석 엔진 탑재
-    function renderAdvancedAnalytics(dailySummary) {
+    async function renderAdvancedAnalytics(dailySummary) {
         lastTrendDailySummary = dailySummary;
         updateChartModeButtons();
 
@@ -1401,10 +1729,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1) 복합 다차원 추이 그래프 시각화 빌드 (Chart.js 제어)
         const ctx = document.getElementById('totalTrendChart');
+        let Chart = null;
         if (ctx) {
+            try {
+                Chart = await loadChartLibrary();
+            } catch (err) {
+                console.error(err);
+                chartLibraryPromise = null;
+                showToast('차트 라이브러리를 불러오지 못했습니다. 새로고침 해주세요.', { tone: 'danger' });
+            }
+        }
+        if (ctx && Chart) {
             if (trendChartInstance) {
                 trendChartInstance.destroy(); // 기존 차트 자원 반환 및 초기화
             }
+            Chart.defaults.color = readCssVar('--text-muted', '#6b7280');
+            Chart.defaults.borderColor = readCssVar('--border', '#e5e7eb');
 
             const positiveSalesValues = totalData.filter(value => value > 0);
             const maxSalesValue = positiveSalesValues.length ? Math.max(...positiveSalesValues) : 0;
@@ -1465,7 +1805,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             pointRadius: 4,
                             pointHoverRadius: 6,
                             pointBorderWidth: 2,
-                            pointBorderColor: '#ffffff',
+                            pointBorderColor: readCssVar('--main-bg', '#ffffff'),
                             tension: 0.2,
                             order: 1,
                             fill: false
@@ -1506,7 +1846,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             pointRadius: 4,
                             pointHoverRadius: 6,
                             pointBorderWidth: 2,
-                            pointBorderColor: '#ffffff',
+                            pointBorderColor: readCssVar('--main-bg', '#ffffff'),
                             tension: 0.2,
                             order: 1,
                             fill: false
@@ -1537,7 +1877,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             pointRadius: 3,
                             pointHoverRadius: 6,
                             pointBorderWidth: 2,
-                            pointBorderColor: '#ffffff',
+                            pointBorderColor: readCssVar('--main-bg', '#ffffff'),
                             tension: 0.3,
                             order: 1,
                             fill: false
@@ -1552,7 +1892,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             pointRadius: 3,
                             pointHoverRadius: 6,
                             pointBorderWidth: 2,
-                            pointBorderColor: '#ffffff',
+                            pointBorderColor: readCssVar('--main-bg', '#ffffff'),
                             tension: 0.3,
                             fill: false,
                             order: 1,
@@ -1635,19 +1975,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (parseDateKey(startStr) > parseDateKey(endStr)) { await window.showAlert("시작일이 종료일보다 늦을 수 없습니다."); return; }
 
+        const seq = ++rangeLoadSeq;
         try {
-            totalTableBody.innerHTML = '<tr><td colspan="11" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 기간 데이터를 종합 분석 중...</td></tr>';
-
-            const summaryRows = await fetchDailySalesSummary(startStr, endStr);
-            const dailySummary = buildDailySummaryFromView(startStr, endStr, summaryRows);
-            const summary = summarizeDailyMap(dailySummary);
+            setEmptyTableMessage(totalTableBody, 11, '기간 데이터를 종합 분석 중...');
 
             const previousRange = getPreviousRange(startStr, endStr);
-            const prevSummaryRows = await fetchDailySalesSummary(previousRange.startStr, previousRange.endStr);
+            const { summaryRows, prevSummaryRows, transactions, previousTransactions } =
+                await fetchPeriodBundle(startStr, endStr, previousRange.startStr, previousRange.endStr);
+            if (seq !== rangeLoadSeq) return;
+
+            const dailySummary = buildDailySummaryFromView(startStr, endStr, summaryRows);
+            const summary = summarizeDailyMap(dailySummary);
             const prevSummary = summarizeDailyMap(buildDailySummaryFromView(previousRange.startStr, previousRange.endStr, prevSummaryRows));
             const comparison = compareTotals(summary, prevSummary);
-            const transactions = await fetchTransactionsForRange(startStr, endStr);
-            const previousTransactions = await fetchTransactionsForRange(previousRange.startStr, previousRange.endStr);
             const weekdaySummary = summarizeWeekdayPerformance(dailySummary, transactions);
             const descriptionSummary = summarizeDescriptions(transactions, {
                 previousTransactions,
@@ -1662,6 +2002,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 accCount += dayData.count; accCash += dayData.cash; accExpense += dayData.expense; accCard += dayData.card; accTotal += dayData.total; accNet += dayData.net;
 
                 const row = document.createElement('tr');
+                // 월간 표와 같이 날짜를 누르면 그날의 건별 내역을 보여준다.
+                row.classList.add('clickable-row');
                 if (dayData.total === 0) row.style.opacity = '0.5';
 
                 const dayName = getDayName(d);
@@ -1680,6 +2022,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="font-weight:700; color:var(--primary);">${dayData.total.toLocaleString()}</td>
                     <td style="font-weight:700; color:var(--text-main);">${dayData.net.toLocaleString()}</td>
                 `;
+                row.addEventListener('click', () => showDayDetailPopup(d));
                 totalTableBody.appendChild(row);
             });
 
@@ -1708,25 +2051,38 @@ document.addEventListener('DOMContentLoaded', () => {
             // 신규 시각화 함수 연동 파이프라인 배치
             const chartFold = document.getElementById('rangeChartFold');
             if (chartFold) chartFold.open = true;
-            renderAdvancedAnalytics(dailySummary);
             renderFlowAnalysis(analyzeSalesFlow(dailySummary));
+            await renderAdvancedAnalytics(dailySummary);
 
         } catch (err) {
+            if (seq !== rangeLoadSeq) return;
             console.error(err);
             setText('rangeChartMeta', '조회 실패');
             setText('rangeDetailMeta', '조회 실패');
-            totalTableBody.innerHTML = `<tr><td colspan="11" class="empty-msg" style="color: var(--danger);">데이터 로드 중 에러가 발생했습니다.</td></tr>`;
+            setEmptyTableMessage(totalTableBody, 11, `데이터 로드 중 에러가 발생했습니다. (${err.message})`, { tone: 'danger' });
         }
     }
 
+    // 엑셀 라이브러리(약 1MB)는 다운로드 버튼을 누를 때만 받아온다.
+    let xlsxLibraryPromise = null;
+    function loadXlsxLibrary() {
+        xlsxLibraryPromise ||= import('xlsx-js-style').then((module) => module.default || module);
+        return xlsxLibraryPromise;
+    }
+
     // 서식(스타일) 세팅 및 엑셀 빌드 핵심 핸들러
-    function downloadStyledExcel(tableId, labelStr) {
+    async function downloadStyledExcel(tableId, labelStr) {
         if (!isSuperAdmin()) {
             window.showAlert('엑셀 백업은 관리자만 실행할 수 있습니다.');
             return;
         }
 
-        if (typeof XLSX === 'undefined') {
+        let XLSX;
+        try {
+            XLSX = await loadXlsxLibrary();
+        } catch (err) {
+            console.error(err);
+            xlsxLibraryPromise = null;
             window.showAlert('엑셀 다운로드를 위한 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 해주세요.');
             return;
         }
@@ -1835,11 +2191,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "매출보고서");
         XLSX.writeFile(wb, `DailyDash_매출보고서_${sanitizeFilePart(labelStr)}_${getBackupTimestamp()}.xlsx`);
-        logOperation('엑셀 백업', labelStr, [
+        api.logExport(labelStr, [
             `${tableId}`,
             `${exportedRowCount.toLocaleString()}건`,
             APP_VERSION_LABEL
-        ]);
+        ]).catch((err) => console.warn('엑셀 백업 이력 기록 실패', err));
+        showToast('엑셀 파일을 내려받았습니다.');
     }
 
     init();
@@ -1847,8 +2204,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.logout = async () => {
     if (await window.showConfirm("로그아웃 하시겠습니까?")) {
-        const sb = createSupabaseClient();
-        await sb.auth.signOut();
+        await api.logout().catch(() => {});
         window.location.replace('login.html');
     }
 };
