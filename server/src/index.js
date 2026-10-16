@@ -2,10 +2,11 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { cleanupExpiredTokens, isAllowedCrossOrigin, loadSession } from './auth.js';
-import { config, isMailEnabled } from './config.js';
+import { config, isAiEnabled, isMailEnabled } from './config.js';
 import { pool, runMigrations, waitForDatabase } from './db.js';
 import { HttpError } from './http.js';
 import adminRoutes from './routes/admin.js';
+import aiRoutes from './routes/ai.js';
 import authRoutes from './routes/auth.js';
 import reportRoutes from './routes/reports.js';
 import transactionRoutes from './routes/transactions.js';
@@ -77,6 +78,7 @@ api.use(loadSession);
 api.use('/auth', authRoutes);
 api.use('/transactions', transactionRoutes);
 api.use('/admin', adminRoutes);
+api.use('/ai', aiRoutes);
 api.use('/', reportRoutes);
 
 api.use((req, res) => {
@@ -143,6 +145,7 @@ async function start() {
     if (!config.adminEmail) console.warn('[auth] ADMIN_EMAIL 이 설정되지 않아 관리자 자동 지정이 꺼져 있습니다.');
     if (config.allowedOrigins.length) console.log(`[web] 외부 화면 허용 출처: ${config.allowedOrigins.join(', ')}`);
     if (!isMailEnabled) console.log('[mail] SMTP 미설정 - 비밀번호 찾기는 관리자 초기화 방식으로 동작합니다.');
+    console.log(isAiEnabled ? `[ai] AI 월간 리포트 사용 (${config.gemini.model})` : '[ai] GEMINI_API_KEY 미설정 - AI 월간 리포트가 꺼져 있습니다.');
   });
 
   const shutdown = (signal) => {

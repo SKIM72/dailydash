@@ -39,7 +39,14 @@ export const config = {
     user: env.SMTP_USER || '',
     pass: env.SMTP_PASS || '',
     from: env.MAIL_FROM || env.SMTP_USER || ''
+  },
+  // (선택) AI 월간 리포트 - Google Gemini API. 키를 비워두면 기능이 꺼진다.
+  gemini: {
+    apiKey: String(env.GEMINI_API_KEY || '').trim(),
+    model: String(env.GEMINI_MODEL || 'gemini-3.8-flash').trim(),
+    baseUrl: String(env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/+$/, '')
   }
 };
 
 export const isMailEnabled = Boolean(config.smtp.host && config.smtp.from);
+export const isAiEnabled = Boolean(config.gemini.apiKey);

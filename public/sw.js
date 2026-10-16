@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v37-compare';
+const CACHE_NAME = 'dailydash-v38-ai-report';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

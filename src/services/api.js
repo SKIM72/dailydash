@@ -145,6 +145,11 @@ export const api = {
   auditLogs: (limit = 30) => get(`/audit-logs?${qs({ limit })}`).then((data) => data.logs),
   logExport: (label, details) => post('/audit-logs/export', { label, details }),
 
+  // AI 월간 리포트 (Gemini) - 만들기는 관리자만
+  aiStatus: () => get('/ai/status'),
+  getMonthlyAiReport: (month) => get(`/ai/monthly-report?${qs({ month })}`).then((data) => data.report),
+  createMonthlyAiReport: (month) => post('/ai/monthly-report', { month }),
+
   // 관리자
   listUsers: () => get('/admin/users').then((data) => data.users),
   approveUser: (id) => post(`/admin/users/${id}/approve`).then((data) => data.user),

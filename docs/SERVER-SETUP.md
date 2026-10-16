@@ -265,6 +265,7 @@ npm run dev            # 화면 → http://127.0.0.1:5173  (/api 는 3000 번으
 - 앱(홈 화면) 아이콘은 `docs/brand/` 의 하늘향 로고 원본으로 만든 `public/icons/*.png` 입니다. (일반 · 안드로이드 마스크형 · iOS · 파비콘)
 - 앱 다운로드 페이지는 `install.html` 입니다. 로그인 화면과 앱 메뉴의 "앱 다운로드" 에서 들어갈 수 있고, QR 코드로 직원 휴대폰에 공유할 수 있습니다.
   안드로이드 앱(APK) 빌드·서명 키 관리는 [ANDROID-APP.md](ANDROID-APP.md) 에 정리되어 있습니다.
+- 월간 요약의 AI 월간 리포트(Google Gemini)를 켜는 방법은 [AI-REPORT.md](AI-REPORT.md) 를 참고하세요.
 - **배포할 때 `public/sw.js` 의 `CACHE_NAME` 버전을 올리세요.** 그래야 직원 휴대폰에 열려 있던 앱에 "새 버전이 준비됐어요 · 새로고침" 안내가 뜹니다.
 
 ## 11. 문제 해결

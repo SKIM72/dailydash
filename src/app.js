@@ -1908,9 +1908,144 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /* ---------------- AI 월간 리포트 (Gemini) ---------------- */
+    // 숫자는 서버가 DB 에서 계산하고, AI 는 해석 문장만 쓴다. 만들기는 관리자만, 보기는 모두.
+    const aiReportCard = document.getElementById('monthAiReport');
+    const aiReportBody = document.getElementById('aiReportBody');
+    const aiReportFoot = document.getElementById('aiReportFoot');
+    const aiReportBtn = document.getElementById('aiReportBtn');
+    const AI_SECTIONS = [
+        ['summary', '핵심 요약', 'insight'],
+        ['positives', '좋았던 점', 'trend-up'],
+        ['cautions', '주의할 점', 'warning'],
+        ['nextActions', '다음 준비', 'calendar-search']
+    ];
+    const AI_PRIVACY_NOTE = '리포트를 만들면 집계된 매출 숫자와 품목명만 Google Gemini(무료 등급)로 보냅니다. 무료 등급은 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요.';
+    let aiStatusPromise = null;
+    let aiReportMonth = null;
+    let aiGenerating = false;
+
+    function getAiStatus() {
+        aiStatusPromise ||= api.aiStatus().catch(() => ({ enabled: false }));
+        return aiStatusPromise;
+    }
+
+    function createEmptyCompact(message) {
+        const box = document.createElement('div');
+        box.className = 'empty-compact';
+        box.textContent = message;
+        return box;
+    }
+
+    function setAiFoot(lines) {
+        aiReportFoot.replaceChildren(...lines.filter(Boolean).map((line) => {
+            const span = document.createElement('span');
+            span.textContent = line;
+            return span;
+        }));
+    }
+
+    function setAiButton({ label, busy = false }) {
+        const text = document.createElement('span');
+        text.textContent = label;
+        const icon = busy ? Object.assign(document.createElement('span'), { className: 'spinner' }) : iconElement('flash');
+        icon.setAttribute('aria-hidden', 'true');
+        aiReportBtn.replaceChildren(icon, text);
+        aiReportBtn.disabled = busy;
+    }
+
+    function renderAiReport(report) {
+        const admin = isSuperAdmin();
+        if (!report) {
+            aiReportBody.replaceChildren(createEmptyCompact(admin
+                ? '아직 이 달의 리포트가 없어요. "리포트 만들기"를 누르면 AI가 이 달 매출을 해석해 드려요.'
+                : '아직 이 달의 리포트가 없어요. 관리자가 만들면 여기에 보여요.'));
+            setAiFoot([admin && AI_PRIVACY_NOTE]);
+            return;
+        }
+        const headline = document.createElement('p');
+        headline.className = 'ai-report__headline';
+        headline.textContent = report.content.headline;
+        const grid = document.createElement('div');
+        grid.className = 'ai-report__grid';
+        AI_SECTIONS.forEach(([key, title, icon]) => {
+            const items = report.content[key] || [];
+            if (items.length === 0) return;
+            const section = document.createElement('section');
+            section.className = `ai-report__section ai-report__section--${key}`;
+            const heading = document.createElement('h3');
+            heading.append(iconElement(icon), title);
+            const list = document.createElement('ul');
+            items.forEach((text) => {
+                const item = document.createElement('li');
+                item.textContent = text;
+                list.append(item);
+            });
+            section.append(heading, list);
+            grid.append(section);
+        });
+        aiReportBody.replaceChildren(headline, grid);
+        const stale = report.month === getKstToday().slice(0, 7) && report.dataThrough < getKstToday();
+        setAiFoot([
+            `${formatKstDateTime(report.createdAt)} 생성 · ${report.dataThrough.replaceAll('-', '.')}까지 반영 · ${report.model}`,
+            stale && admin ? '그 뒤 입력분까지 반영하려면 "다시 만들기"를 누르세요.' : '',
+            'AI가 쓴 해석이에요. 숫자는 위 표와 함께 확인해 주세요.',
+            admin && AI_PRIVACY_NOTE
+        ]);
+    }
+
+    async function loadMonthlyAiReport(month) {
+        aiReportMonth = month;
+        const status = await getAiStatus();
+        const admin = isSuperAdmin();
+        // 꺼져 있으면 관리자에게만 설정 안내를 보여 준다.
+        aiReportCard.classList.toggle('hidden-view', !status.enabled && !admin);
+        aiReportBtn.classList.toggle('hidden-view', !status.enabled || !admin);
+        if (!status.enabled) {
+            if (admin) {
+                aiReportBody.replaceChildren(createEmptyCompact('서버에 Gemini API 키(GEMINI_API_KEY)를 넣으면 AI가 월간 리포트를 써 드려요. 설정 방법은 docs/AI-REPORT.md 를 참고하세요.'));
+                setAiFoot([]);
+            }
+            return;
+        }
+        if (aiGenerating) return;
+        aiReportBody.replaceChildren(createEmptyCompact('리포트를 불러오는 중...'));
+        setAiFoot([]);
+        try {
+            const report = await api.getMonthlyAiReport(month);
+            if (aiReportMonth !== month || aiGenerating) return;
+            renderAiReport(report);
+            setAiButton({ label: report ? '다시 만들기' : '리포트 만들기' });
+        } catch (err) {
+            if (aiReportMonth !== month) return;
+            aiReportBody.replaceChildren(createEmptyCompact(`리포트를 불러오지 못했어요. (${err.message})`));
+        }
+    }
+
+    aiReportBtn?.addEventListener('click', async () => {
+        const month = aiReportMonth;
+        if (!month || aiGenerating) return;
+        aiGenerating = true;
+        setAiButton({ label: '만드는 중...', busy: true });
+        aiReportBody.replaceChildren(createEmptyCompact('AI가 이 달 매출을 읽고 리포트를 쓰는 중이에요. 보통 10~30초 걸려요.'));
+        try {
+            const { report, cached } = await api.createMonthlyAiReport(month);
+            if (aiReportMonth === month) renderAiReport(report);
+            showToast(cached ? '데이터가 그대로라 저장된 리포트를 보여 드려요.' : 'AI 월간 리포트를 만들었어요.', { tone: cached ? 'info' : 'success' });
+        } catch (err) {
+            showToast(err.message, { tone: 'danger', duration: 6000 });
+        } finally {
+            aiGenerating = false;
+            setAiButton({ label: '다시 만들기' });
+            if (aiReportMonth !== month) loadMonthlyAiReport(aiReportMonth);
+            else if (aiReportBody.querySelector('.empty-compact')) loadMonthlyAiReport(month);
+        }
+    });
+
     async function loadMonthlyData(monthStr) {
         if (!monthStr) return;
         const seq = ++monthlyLoadSeq;
+        loadMonthlyAiReport(monthStr);
         try {
             setEmptyTableMessage(monthlyTableBody, 11, '데이터를 분석하는 중...');
             const pad = (value) => String(value).padStart(2, '0');

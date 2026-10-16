@@ -358,6 +358,15 @@
                 <ul id="monthInsightList"><li>월을 선택하면 매출 흐름을 요약합니다.</li></ul>
             </section>
 
+            <section class="card card--outlined ai-report hidden-view" id="monthAiReport" aria-labelledby="monthAiTitle">
+                <div class="section-head">
+                    <h2 id="monthAiTitle"><i data-icon="flash"></i>AI 월간 리포트</h2>
+                    <button type="button" class="btn btn-tonal hidden-view" id="aiReportBtn"><i data-icon="flash"></i><span>리포트 만들기</span></button>
+                </div>
+                <div class="ai-report__body" id="aiReportBody" aria-live="polite"><div class="empty-compact">월을 선택하면 AI 리포트를 불러옵니다.</div></div>
+                <p class="ai-report__foot" id="aiReportFoot"></p>
+            </section>
+
             <div class="analysis-panels">
                 <section class="card card--outlined analysis-panel">
                     <div class="section-head"><h2><i data-icon="calendar-search"></i>요일 패턴</h2></div>

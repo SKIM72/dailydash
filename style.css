@@ -889,6 +889,22 @@ html[data-theme="dark"] .compare-row--reference { background: transparent; }
 .compare-delta.is-negative { background: var(--md-error-container); color: var(--md-on-error-container); }
 .compare-row__note { font-size: 0.75rem; color: var(--md-on-surface-variant); }
 
+/* AI 월간 리포트 */
+.ai-report__headline { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.45; margin-bottom: 1rem; word-break: keep-all; }
+.ai-report__grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.ai-report__section { padding: 0.875rem 1rem; border-radius: var(--shape-md); background: var(--md-surface-container-low); --tone: var(--md-primary); }
+html[data-theme="dark"] .ai-report__section { background: var(--md-surface-container); }
+.ai-report__section--positives { --tone: var(--md-tertiary); }
+.ai-report__section--cautions { --tone: var(--md-error); }
+.ai-report__section--nextActions { --tone: var(--md-violet); }
+.ai-report__section h3 { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 800; color: var(--tone); margin-bottom: 0.5rem; }
+.ai-report__section h3 .icon { width: 1.125rem; height: 1.125rem; }
+.ai-report__section ul { list-style: none; display: flex; flex-direction: column; gap: 0.375rem; }
+.ai-report__section li { position: relative; padding-left: 0.875rem; font-size: 0.875rem; line-height: 1.55; word-break: keep-all; }
+.ai-report__section li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--tone); }
+.ai-report__foot { display: flex; flex-direction: column; gap: 0.125rem; margin-top: 0.875rem; font-size: 0.75rem; color: var(--md-on-surface-variant); word-break: keep-all; }
+.ai-report__foot:empty { display: none; }
+
 .insight-panel { --tone: var(--md-primary); }
 .insight-panel ul { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
 .insight-panel li { position: relative; padding: 0.625rem 0.875rem 0.625rem 2.25rem; border-radius: var(--shape-md); background: var(--md-surface-container-low); font-size: 0.875rem; line-height: 1.55; word-break: keep-all; }
