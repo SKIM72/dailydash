@@ -9,3 +9,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 backups/
+
+# 안드로이드 앱 빌드 산출물 · 서명 키 (키는 저장소 밖에 보관)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore
+keystore.properties

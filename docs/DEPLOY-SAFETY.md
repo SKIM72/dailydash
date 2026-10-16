@@ -10,5 +10,7 @@
 5. 반영 후 `docker compose ps` 로 app 이 `healthy` 인지, `docker compose logs --tail 50 app` 에 오류가 없는지 확인합니다.
 6. 화면을 바꿔 배포할 때는 `public/sw.js` 의 `CACHE_NAME` 을 올립니다. 열려 있던 앱에 새로고침 안내가 뜹니다.
    그래도 옛 화면이 보이면 앱을 완전히 닫았다가 다시 열도록 안내합니다.
+7. 화면을 바꿨다면 GitHub Pages 뿐 아니라 서버도 다시 빌드합니다. 안드로이드 앱(APK)은 서버 주소의 화면을 엽니다.
+   APK 를 새로 만들 때는 서명 키 폴더가 필요합니다. ([ANDROID-APP.md](ANDROID-APP.md))
 
 전체 운영 방법은 [SERVER-SETUP.md](SERVER-SETUP.md) 를 참고하세요.

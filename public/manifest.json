@@ -24,19 +24,28 @@
       "short_name": "입력",
       "description": "오늘 매출 내역을 바로 입력합니다",
       "url": "./index.html?view=daily&action=new",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [
+        { "src": "icons/shortcut-new.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icons/shortcut-new-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+      ]
     },
     {
       "name": "월간 요약",
       "short_name": "월간",
       "url": "./index.html?view=monthly",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [
+        { "src": "icons/shortcut-monthly.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icons/shortcut-monthly-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+      ]
     },
     {
       "name": "통계 분석",
       "short_name": "통계",
       "url": "./index.html?view=total",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [
+        { "src": "icons/shortcut-stats.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icons/shortcut-stats-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+      ]
     }
   ]
 }

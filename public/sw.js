@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v32-pwa';
+const CACHE_NAME = 'dailydash-v33-apk';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -23,6 +23,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   // 정산 데이터(API)는 항상 서버에서 새로 받는다. 캐시된 옛 숫자를 보여주지 않기 위함.
   if (url.pathname.startsWith('/api/')) return;
+  // 앱 설치 파일(APK)과 앱 인증 파일은 크거나 항상 최신이어야 하므로 캐시하지 않는다.
+  if (url.pathname.includes('/downloads/') || url.pathname.includes('/.well-known/')) return;
 
   event.respondWith(
     fetch(event.request)

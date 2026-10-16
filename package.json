@@ -8,7 +8,8 @@
     "dev:server": "npm --prefix server run dev",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "apk": "node scripts/build-apk.mjs"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

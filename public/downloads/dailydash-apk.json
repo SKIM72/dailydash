@@ -1,0 +1,11 @@
+{
+  "file": "dailydash.apk",
+  "packageId": "org.duckdns.dailydash.twa",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "size": 2653718,
+  "sha256": "3778f05bb6f28a028c15ecb9d02c11bdc937207ffc4a2279eb509f026c65d77e",
+  "certificateSha256": "C4:BE:25:24:57:D1:8D:FC:63:9F:8B:39:06:13:D3:C2:8D:27:24:6B:E0:B8:7E:17:E7:6D:2E:A6:06:E9:1A:DB",
+  "minAndroid": "7.0",
+  "builtAt": "2026-10-16"
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "org.duckdns.dailydash.twa",
+      "sha256_cert_fingerprints": [
+        "C4:BE:25:24:57:D1:8D:FC:63:9F:8B:39:06:13:D3:C2:8D:27:24:6B:E0:B8:7E:17:E7:6D:2E:A6:06:E9:1A:DB"
+      ]
+    }
+  }
+]

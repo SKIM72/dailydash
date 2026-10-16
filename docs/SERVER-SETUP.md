@@ -188,6 +188,10 @@ docker compose up -d --build
 
 DB 구조 변경(마이그레이션)은 앱이 시작할 때 자동으로 적용됩니다. 화면은 push 하면 GitHub Pages 가 알아서 배포합니다.
 
+> **안드로이드 앱(APK)은 서버 주소(`https://dailydash.duckdns.org`)의 화면을 엽니다.**
+> 화면을 고쳤다면 Pages 뿐 아니라 서버도 위 명령으로 다시 빌드해야 앱 사용자에게 반영됩니다.
+> 자세한 내용은 [ANDROID-APP.md](ANDROID-APP.md) 를 참고하세요.
+
 ### push 하면 서버도 자동 배포 (선택)
 
 `.github/workflows/deploy-server.yml` 이 준비되어 있습니다. 집 PC 의 SSH(22) 포트를 인터넷에 열어야 하므로,
@@ -259,7 +263,8 @@ npm run dev            # 화면 → http://127.0.0.1:5173  (/api 는 3000 번으
   - JS 에서는 `iconSvg('이름')` / `iconElement('이름')` (`src/shared/icons.js`) 를 씁니다.
   - 새 아이콘이 필요하면 `scripts/build-icons.mjs` 의 목록에 추가하고 `npm run icons` 를 실행하세요.
 - 앱(홈 화면) 아이콘은 `docs/brand/` 의 하늘향 로고 원본으로 만든 `public/icons/*.png` 입니다. (일반 · 안드로이드 마스크형 · iOS · 파비콘)
-- 앱 설치 안내 페이지는 `install.html` 입니다. 로그인 화면과 앱 메뉴의 "앱 설치" 에서 들어갈 수 있고, QR 코드로 직원 휴대폰에 공유할 수 있습니다.
+- 앱 다운로드 페이지는 `install.html` 입니다. 로그인 화면과 앱 메뉴의 "앱 다운로드" 에서 들어갈 수 있고, QR 코드로 직원 휴대폰에 공유할 수 있습니다.
+  안드로이드 앱(APK) 빌드·서명 키 관리는 [ANDROID-APP.md](ANDROID-APP.md) 에 정리되어 있습니다.
 - **배포할 때 `public/sw.js` 의 `CACHE_NAME` 버전을 올리세요.** 그래야 직원 휴대폰에 열려 있던 앱에 "새 버전이 준비됐어요 · 새로고침" 안내가 뜹니다.
 
 ## 11. 문제 해결

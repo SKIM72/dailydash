@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import path from 'node:path';
 import express from 'express';
 import { cleanupExpiredTokens, isAllowedCrossOrigin, loadSession } from './auth.js';
 import { config, isMailEnabled } from './config.js';
@@ -85,6 +86,16 @@ api.use((req, res) => {
 app.use('/api', api);
 
 if (existsSync(config.staticDir)) {
+  // 안드로이드 앱(APK)이 주소창 없이 열리려면 이 사이트가 앱의 주인임을 assetlinks.json 으로 증명해야 한다.
+  // 점(.)으로 시작하는 폴더는 기본 정적 처리에서 숨겨지므로 따로 연결한다.
+  app.use(
+    '/.well-known',
+    express.static(path.join(config.staticDir, '.well-known'), {
+      setHeaders(res) {
+        res.set('Cache-Control', 'public, max-age=3600');
+      }
+    })
+  );
   app.use(
     express.static(config.staticDir, {
       extensions: ['html'],

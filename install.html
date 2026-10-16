@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>DailyDash 앱 설치</title>
-    <meta name="description" content="하늘향 매출 장부 DailyDash 를 휴대폰·PC 에 앱으로 설치하는 방법">
+    <title>DailyDash 앱 다운로드</title>
+    <meta name="description" content="하늘향 매출 장부 DailyDash 안드로이드 앱(APK) 다운로드와 아이폰·PC 설치 방법">
 
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#f7f8fc">
@@ -52,13 +52,15 @@
         <section class="install-hero" aria-labelledby="installTitle">
             <img class="install-hero__icon" src="/icons/icon-512.png" alt="DailyDash 앱 아이콘">
             <div>
-                <h1 id="installTitle">DailyDash 앱 설치</h1>
-                <p>하늘향 매출 장부를 홈 화면에 추가하면 앱처럼 한 번에 열리고, 주소창 없이 넓은 화면으로 쓸 수 있어요.</p>
+                <h1 id="installTitle">DailyDash 앱 다운로드</h1>
+                <p>안드로이드는 앱(APK)을 받아 설치하고, 아이폰·PC 는 홈 화면에 추가하면 앱처럼 한 번에 열려요.</p>
                 <div class="install-hero__actions">
+                    <a class="btn btn-filled btn--lg hidden-view" id="apkBtn" href="downloads/dailydash.apk" download data-apk-link><i data-icon="download"></i>안드로이드 앱 다운로드</a>
                     <button type="button" class="btn btn-filled btn--lg hidden-view" id="installBtn"><i data-icon="download"></i>앱 설치하기</button>
                     <a class="btn btn-outlined btn--lg" href="#guide" id="guideBtn"><i data-icon="info"></i>설치 방법 보기</a>
                     <span class="install-status hidden-view" id="installedStatus" role="status"><i data-icon="check" data-variant="bold"></i>지금 앱으로 실행 중이에요</span>
                 </div>
+                <p class="install-hero__meta hidden-view" id="apkHeroMeta" data-apk-meta></p>
             </div>
             <img class="install-hero__wordmark" src="/brand/wordmark-light.png" alt="">
         </section>
@@ -80,13 +82,29 @@
                 </ol>
             </details>
             <details class="install-guide" data-platform="android">
-                <summary><i data-icon="mobile"></i>안드로이드 (Chrome · 삼성 인터넷)<span class="chip chip--static hidden-view" data-this-device>이 기기</span><i data-icon="arrow-down" data-variant="bold"></i></summary>
-                <ol class="install-steps">
-                    <li><span>위의 <strong>앱 설치하기</strong> 버튼을 누르세요. 버튼이 안 보이면 다음 단계로 진행하세요.</span></li>
-                    <li><span>브라우저 오른쪽 위(삼성 인터넷은 아래) <strong>⋮ 메뉴</strong>를 여세요.</span></li>
-                    <li><span><strong>앱 설치</strong> 또는 <strong>홈 화면에 추가</strong>를 누르세요.</span></li>
-                    <li><span>설치가 끝나면 홈 화면과 앱 목록에 DailyDash 가 생겨요.</span></li>
+                <summary><i data-icon="mobile"></i>안드로이드 (APK 앱)<span class="chip chip--static hidden-view" data-this-device>이 기기</span><i data-icon="arrow-down" data-variant="bold"></i></summary>
+                <div class="apk-card" data-apk>
+                    <img class="apk-card__icon" src="/icons/icon-192.png" alt="">
+                    <div class="apk-card__text">
+                        <strong>DailyDash 안드로이드 앱</strong>
+                        <small data-apk-meta>안드로이드 7.0 이상</small>
+                    </div>
+                    <a class="btn btn-filled" href="downloads/dailydash.apk" download data-apk-link><i data-icon="download"></i>APK 받기</a>
+                </div>
+                <ol class="install-steps" data-apk>
+                    <li><span><strong>APK 받기</strong>를 누르세요. "유해할 수 있는 파일" 안내가 나오면 <strong>다운로드</strong>를 누르세요.</span></li>
+                    <li><span>다운로드가 끝나면 알림이나 <strong>내 파일 › 다운로드</strong>에서 받은 파일을 여세요.</span></li>
+                    <li><span>"출처를 알 수 없는 앱" 안내가 나오면 <strong>설정</strong> › <strong>이 출처 허용</strong>을 켜고 뒤로 돌아오세요.</span></li>
+                    <li><span><strong>설치</strong>를 누르세요. Play 프로텍트 안내가 나오면 <strong>세부정보 › 무시하고 설치</strong>를 누르세요.</span></li>
+                    <li><span>홈 화면의 DailyDash 아이콘으로 열고 로그인하면 끝!</span></li>
                 </ol>
+                <div class="install-alt">
+                    <p class="install-alt__title" data-apk>APK 없이 브라우저로 설치하려면</p>
+                    <ol class="install-steps">
+                        <li><span>Chrome 오른쪽 위(삼성 인터넷은 아래) <strong>⋮ 메뉴</strong>를 여세요.</span></li>
+                        <li><span><strong>앱 설치</strong> 또는 <strong>홈 화면에 추가</strong>를 누르세요.</span></li>
+                    </ol>
+                </div>
             </details>
             <details class="install-guide" data-platform="desktop">
                 <summary><i data-icon="monitor"></i>PC (Chrome · Edge)<span class="chip chip--static hidden-view" data-this-device>이 기기</span><i data-icon="arrow-down" data-variant="bold"></i></summary>
@@ -101,7 +119,7 @@
             <div class="install-qr__code" id="qrCode" role="img" aria-label="이 설치 안내 페이지로 연결되는 QR 코드"></div>
             <div>
                 <h2 class="t-title-m" id="qrTitle">휴대폰으로 열기</h2>
-                <p class="muted t-body-m" style="margin: 0.25rem 0 0.75rem;">휴대폰 카메라로 QR 코드를 비추면 이 설치 안내가 열려요. 직원분들께 링크를 보내도 돼요.</p>
+                <p class="muted t-body-m" style="margin: 0.25rem 0 0.75rem;">휴대폰 카메라로 QR 코드를 비추면 이 페이지가 열리고, 안드로이드는 바로 앱을 받을 수 있어요. 직원분들께 링크를 보내도 돼요.</p>
                 <button type="button" class="btn btn-tonal" id="copyLinkBtn"><i data-icon="copy"></i>링크 복사</button>
             </div>
         </section>
@@ -110,11 +128,16 @@
             <h2 class="t-title-m" id="faqTitle" style="margin-bottom: 0.5rem;">자주 묻는 질문</h2>
             <details>
                 <summary>앱스토어 · 플레이스토어에는 없나요?</summary>
-                <p>DailyDash 는 웹 앱(PWA)이라 스토어를 거치지 않고 이 페이지에서 바로 설치해요. 용량이 작고, 따로 업데이트할 필요도 없어요.</p>
+                <p>하늘향 전용 앱이라 스토어에 올리지 않았어요. 안드로이드는 이 페이지에서 APK 를 받아 설치하고, 아이폰은 Safari 의 "홈 화면에 추가" 로 설치해요.</p>
+            </details>
+            <details data-apk>
+                <summary>APK 를 설치할 때 경고가 나와요. 괜찮나요?</summary>
+                <p>플레이스토어 밖에서 받은 앱에는 항상 나오는 안내예요. 이 페이지에서 받은 파일은 하늘향 서명 키로 서명되어 있어요. 다른 곳에서 받은 "DailyDash" 파일은 설치하지 마세요.</p>
+                <p class="apk-fingerprint">APK 파일 SHA-256<br><code id="apkSha256">-</code></p>
             </details>
             <details>
                 <summary>업데이트는 어떻게 하나요?</summary>
-                <p>새 버전이 나오면 앱을 열 때 자동으로 받아요. 화면 아래에 "새 버전이 준비됐어요" 가 보이면 새로고침을 눌러 주세요.</p>
+                <p>안드로이드 앱과 홈 화면 앱 모두 화면을 서버에서 불러오기 때문에, 새 기능은 앱을 열 때 자동으로 받아요. 화면 아래에 "새 버전이 준비됐어요" 가 보이면 새로고침을 눌러 주세요. APK 파일을 다시 받아야 하는 경우는 드물고, 그때는 이 페이지에 새 버전이 표시돼요.</p>
             </details>
             <details>
                 <summary>입력한 데이터는 휴대폰에 저장되나요?</summary>
@@ -125,8 +148,12 @@
                 <p>이미 설치되어 있거나, 브라우저가 버튼 설치를 지원하지 않는 경우예요. 위의 기기별 설치 방법을 따라 해 주세요. 아이폰은 공유 메뉴의 "홈 화면에 추가" 로 설치해요.</p>
             </details>
             <details>
+                <summary>앱 위쪽에 주소창이 보여요.</summary>
+                <p>안드로이드 앱은 휴대폰의 Chrome 으로 화면을 띄워요. Chrome 이 꺼져 있거나 오래된 버전이면 주소창이 보일 수 있어요. 플레이스토어에서 Chrome 을 최신으로 업데이트한 뒤 앱을 다시 열어 주세요.</p>
+            </details>
+            <details>
                 <summary>앱을 지우려면?</summary>
-                <p>홈 화면의 DailyDash 아이콘을 길게 눌러 삭제하면 돼요. 서버의 데이터는 그대로 남아 있어요.</p>
+                <p>홈 화면의 DailyDash 아이콘을 길게 눌러 삭제(또는 앱 정보 › 제거)하면 돼요. 서버의 데이터는 그대로 남아 있어요.</p>
             </details>
         </section>
     </main>

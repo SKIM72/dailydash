@@ -1128,6 +1128,17 @@ html[data-theme="dark"] .install-hero { background: radial-gradient(circle at 12
 .install-hero .btn-outlined { border-color: rgb(255 255 255 / 0.6); color: #fff; }
 .install-status { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.875rem; border-radius: var(--shape-full); background: rgb(255 255 255 / 0.18); font-weight: 700; font-size: 0.875rem; }
 .install-status .icon { width: 1.25rem; height: 1.25rem; }
+.install-hero p.install-hero__meta { margin-top: 0.625rem; font-size: 0.8125rem; opacity: 0.8; }
+.apk-card { display: flex; align-items: center; gap: 0.875rem; margin: 0 1.25rem 0.875rem; padding: 0.875rem 1rem; border-radius: var(--shape-md); background: var(--md-primary-container); color: var(--md-on-primary-container); }
+.apk-card__icon { width: 3rem; height: 3rem; border-radius: 26%; flex-shrink: 0; }
+.apk-card__text { display: flex; flex-direction: column; gap: 0.125rem; flex: 1; min-width: 0; }
+.apk-card__text small { font-size: 0.8125rem; opacity: 0.85; }
+.apk-card .btn { flex-shrink: 0; }
+.install-alt { padding: 0 0 0.25rem; }
+.install-alt__title { margin: 0 1.25rem 0.625rem; font-size: 0.875rem; font-weight: 700; color: var(--md-on-surface-variant); }
+.install-alt .install-steps li { background: transparent; border: 1px dashed var(--md-outline-variant); }
+.apk-fingerprint { font-size: 0.75rem !important; }
+.apk-fingerprint code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; word-break: break-all; }
 .install-perks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
 .install-perk { display: flex; flex-direction: column; gap: 0.375rem; padding: 1rem; border-radius: var(--shape-lg); background: var(--md-surface-container-low); }
 html[data-theme="dark"] .install-perk { background: var(--md-surface-container); }
@@ -1253,6 +1264,9 @@ html[data-theme="dark"] .install-steps li { background: var(--md-surface-contain
     .install-hero__actions .btn { flex: 1; }
     .install-perks { grid-template-columns: 1fr; }
     .install-qr { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    .apk-card { flex-wrap: wrap; margin: 0 1rem 0.875rem; }
+    .apk-card .btn { width: 100%; }
+    .install-body .snackbar-host, .install-body .toast-container { bottom: calc(1rem + env(safe-area-inset-bottom)); }
     .auth-layout { grid-template-columns: 1fr; }
     .auth-hero { display: none; }
     .auth-panel { align-items: flex-start; padding: 4.5rem 1.25rem 2rem; min-height: 100vh; }

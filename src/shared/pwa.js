@@ -1,9 +1,30 @@
 // PWA 공통: 서비스워커 등록 · 새 버전 알림 · 앱(홈 화면)으로 실행 중인지 판별
 
 const LOCAL_HOSTS = ['127.0.0.1', 'localhost'];
+const ANDROID_APP_KEY = 'dailydash-android-app';
+
+// 안드로이드 앱(APK)은 시작 주소에 ?source=twa 를 붙이고, 첫 화면의 referrer 가 android-app:// 이다.
+// 로그인 화면으로 넘어가도 기억하도록 탭(세션) 단위로 표시해 둔다.
+function rememberAndroidApp() {
+  const launchedFromApp = new URLSearchParams(window.location.search).get('source') === 'twa'
+    || document.referrer.startsWith('android-app://');
+  try {
+    if (launchedFromApp) sessionStorage.setItem(ANDROID_APP_KEY, '1');
+    return sessionStorage.getItem(ANDROID_APP_KEY) === '1';
+  } catch {
+    return launchedFromApp;
+  }
+}
+const runningInAndroidApp = rememberAndroidApp();
+
+export function isAndroidApp() {
+  return runningInAndroidApp;
+}
 
 export function isStandalone() {
-  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  return runningInAndroidApp
+    || window.matchMedia?.('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
 }
 
 export function detectPlatform() {

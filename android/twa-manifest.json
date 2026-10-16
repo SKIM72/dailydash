@@ -1,0 +1,69 @@
+{
+  "packageId": "org.duckdns.dailydash.twa",
+  "host": "dailydash.duckdns.org",
+  "name": "DailyDash 하늘향 일계표",
+  "launcherName": "DailyDash",
+  "display": "standalone",
+  "themeColor": "#F7F8FC",
+  "themeColorDark": "#101318",
+  "navigationColor": "#F7F8FC",
+  "navigationColorDark": "#101318",
+  "navigationDividerColor": "#F7F8FC",
+  "navigationDividerColorDark": "#101318",
+  "backgroundColor": "#F7F8FC",
+  "enableNotifications": false,
+  "startUrl": "/index.html?source=twa",
+  "iconUrl": "https://dailydash.duckdns.org/icons/icon-512.png",
+  "maskableIconUrl": "https://dailydash.duckdns.org/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\aa\\DailyDash-Android-Key\\dailydash-release.jks",
+    "alias": "dailydash"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "내역 입력",
+      "shortName": "입력",
+      "url": "/index.html?view=daily&action=new&source=twa",
+      "chosenIconUrl": "https://dailydash.duckdns.org/icons/shortcut-new.png",
+      "chosenMaskableIconUrl": "https://dailydash.duckdns.org/icons/shortcut-new-maskable.png"
+    },
+    {
+      "name": "월간 요약",
+      "shortName": "월간",
+      "url": "/index.html?view=monthly&source=twa",
+      "chosenIconUrl": "https://dailydash.duckdns.org/icons/shortcut-monthly.png",
+      "chosenMaskableIconUrl": "https://dailydash.duckdns.org/icons/shortcut-monthly-maskable.png"
+    },
+    {
+      "name": "통계 분석",
+      "shortName": "통계",
+      "url": "/index.html?view=total&source=twa",
+      "chosenIconUrl": "https://dailydash.duckdns.org/icons/shortcut-stats.png",
+      "chosenMaskableIconUrl": "https://dailydash.duckdns.org/icons/shortcut-stats-maskable.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "minSdkVersion": 24,
+  "orientation": "default",
+  "fingerprints": [
+    {
+      "name": "release",
+      "value": "C4:BE:25:24:57:D1:8D:FC:63:9F:8B:39:06:13:D3:C2:8D:27:24:6B:E0:B8:7E:17:E7:6D:2E:A6:06:E9:1A:DB"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "displayOverride": [],
+  "appVersion": "1.0.0"
+}
