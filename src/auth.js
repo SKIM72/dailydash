@@ -1,7 +1,8 @@
 import '../style.css';
 import { api, getCurrentUser } from './services/api.js';
+import { setIcon } from './shared/icons.js';
 import { installModalHandlers } from './shared/modal.js';
-import { initTheme } from './shared/theme.js';
+import { initTheme, resolveTheme, toggleTheme } from './shared/theme.js';
 import { renderVersionLabels } from './shared/version.js';
 
 installModalHandlers();
@@ -27,14 +28,35 @@ function applyResetAvailability() {
     document.getElementById('resetSubtitle')?.classList.toggle('hidden-view', !emailResetEnabled);
 }
 
-function setButtonLoading(button, loadingHtml) {
+function setButtonLoading(button, label) {
     const originalHtml = button.innerHTML;
-    button.innerHTML = loadingHtml;
+    button.innerHTML = `<span class="spinner" aria-hidden="true"></span>${label}`;
     button.disabled = true;
     return () => {
         button.innerHTML = originalHtml;
         button.disabled = false;
     };
+}
+
+// 입력칸 아래에 오류를 보여준다. 다시 입력하면 지운다.
+function showFieldError(fieldId, supportId, message) {
+    const field = document.getElementById(fieldId);
+    const support = document.getElementById(supportId);
+    field?.classList.add('has-error');
+    if (support) {
+        support.textContent = message;
+        support.classList.add('is-error');
+    }
+    field?.querySelector('input')?.focus();
+}
+
+function clearFieldError(fieldId, supportId) {
+    document.getElementById(fieldId)?.classList.remove('has-error');
+    const support = document.getElementById(supportId);
+    if (support) {
+        support.textContent = '';
+        support.classList.remove('is-error');
+    }
 }
 
 function readStorage(key) {
@@ -54,6 +76,15 @@ function writeStorage(key, value) {
     }
 }
 
+function paintThemeToggle() {
+    const button = document.getElementById('themeToggleBtn');
+    if (!button) return;
+    const dark = resolveTheme() === 'dark';
+    setIcon(button, dark ? 'sun' : 'moon');
+    button.setAttribute('aria-label', dark ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기');
+    button.title = button.getAttribute('aria-label');
+}
+
 function bindStaticControls() {
     document.querySelectorAll('[data-view]').forEach((button) => {
         button.addEventListener('click', () => toggleView(button.dataset.view));
@@ -62,20 +93,25 @@ function bindStaticControls() {
     document.querySelectorAll('[data-toggle-password]').forEach((button) => {
         button.addEventListener('click', () => {
             const input = document.getElementById(button.dataset.togglePassword);
-            const icon = button.querySelector('i');
             if (!input) return;
             const reveal = input.type === 'password';
             input.type = reveal ? 'text' : 'password';
-            icon?.classList.toggle('fa-eye', !reveal);
-            icon?.classList.toggle('fa-eye-slash', reveal);
+            setIcon(button, reveal ? 'eye-slash' : 'eye');
             button.setAttribute('aria-label', reveal ? '비밀번호 숨기기' : '비밀번호 보기');
         });
     });
+
+    document.getElementById('themeToggleBtn')?.addEventListener('click', () => {
+        toggleTheme();
+        paintThemeToggle();
+    });
+    paintThemeToggle();
 }
 
 function bindLoginForm() {
     const form = document.getElementById('loginForm');
     const emailInput = document.getElementById('loginEmail');
+    const passwordInput = document.getElementById('loginPassword');
     const rememberCheckbox = document.getElementById('rememberEmail');
     const loginBtn = document.getElementById('loginBtn');
 
@@ -83,25 +119,35 @@ function bindLoginForm() {
     if (savedEmail) {
         emailInput.value = savedEmail;
         rememberCheckbox.checked = true;
-        document.getElementById('loginPassword')?.focus();
+        passwordInput.focus();
     }
+
+    passwordInput.addEventListener('input', () => clearFieldError('loginPasswordField', 'loginError'));
+    emailInput.addEventListener('input', () => clearFieldError('loginPasswordField', 'loginError'));
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const email = emailInput.value.trim();
-        const password = document.getElementById('loginPassword').value;
+        const password = passwordInput.value;
+        if (!email || !password) {
+            showFieldError('loginPasswordField', 'loginError', '이메일과 비밀번호를 모두 입력해 주세요.');
+            return;
+        }
         writeStorage(REMEMBER_EMAIL_KEY, rememberCheckbox.checked ? email : null);
 
-        const restore = setButtonLoading(loginBtn, '<i class="fas fa-spinner fa-spin"></i> 처리중...');
+        const restore = setButtonLoading(loginBtn, '확인 중...');
         try {
             await api.login(email, password);
             window.location.replace('index.html');
         } catch (err) {
             restore();
             if (err.code === 'PENDING_APPROVAL') {
-                await window.showAlert('⚠️ 아직 가입 승인이 완료되지 않은 계정입니다.<br>최고 관리자의 가입 승인을 기다려주세요.');
+                await window.showAlert('아직 가입 승인 전이에요\n관리자가 승인하면 바로 로그인할 수 있습니다.', { icon: 'clock' });
+            } else if (err.code === 'NETWORK_ERROR') {
+                await window.showAlert(`서버에 연결할 수 없어요\n${err.message}`, { tone: 'danger', icon: 'offline' });
             } else {
-                await window.showAlert(`로그인 실패: ${err.message}`);
+                showFieldError('loginPasswordField', 'loginError', err.message);
+                passwordInput.select();
             }
         }
     });
@@ -110,26 +156,31 @@ function bindLoginForm() {
 function bindSignupForm() {
     const form = document.getElementById('signupForm');
     const signupBtn = document.getElementById('signupBtn');
+    const confirmInput = document.getElementById('signupConfirmPassword');
+    confirmInput.addEventListener('input', () => clearFieldError('signupConfirmField', 'signupError'));
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const email = document.getElementById('signupEmail').value.trim();
         const password = document.getElementById('signupPassword').value;
-        const confirmPassword = document.getElementById('signupConfirmPassword').value;
 
-        if (password !== confirmPassword) {
-            await window.showAlert('⚠️ 입력하신 두 비밀번호가 일치하지 않습니다.<br>다시 확인해 주세요.');
+        if (!email || password.length < 8) {
+            showFieldError('signupConfirmField', 'signupError', '이메일과 8자 이상의 비밀번호를 입력해 주세요.');
+            return;
+        }
+        if (password !== confirmInput.value) {
+            showFieldError('signupConfirmField', 'signupError', '두 비밀번호가 일치하지 않아요.');
             return;
         }
 
-        const restore = setButtonLoading(signupBtn, '<i class="fas fa-spinner fa-spin"></i> 가입중...');
+        const restore = setButtonLoading(signupBtn, '신청 중...');
         try {
             const user = await api.signup(email, password);
             restore();
             if (user.status === 'approved') {
-                await window.showAlert('관리자 계정으로 가입되었습니다.<br>바로 로그인할 수 있습니다.');
+                await window.showAlert('관리자 계정으로 가입되었어요\n바로 로그인할 수 있습니다.', { tone: 'success' });
             } else {
-                await window.showAlert('회원가입 신청이 안전하게 완료되었습니다!<br>최고 관리자의 승인 완료 후 대시보드 로그인이 가능합니다.');
+                await window.showAlert('가입 신청이 완료되었어요\n관리자가 승인하면 로그인할 수 있습니다.', { tone: 'success' });
             }
             form.reset();
             toggleView('login');
@@ -137,7 +188,7 @@ function bindSignupForm() {
             document.getElementById('loginPassword').focus();
         } catch (err) {
             restore();
-            await window.showAlert(`회원가입 실패: ${err.message}`);
+            showFieldError('signupConfirmField', 'signupError', err.message);
         }
     });
 }
@@ -149,11 +200,11 @@ function bindResetForm() {
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const email = document.getElementById('resetEmail').value.trim();
-        const restore = setButtonLoading(resetBtn, '<i class="fas fa-spinner fa-spin"></i> 발송중...');
+        const restore = setButtonLoading(resetBtn, '보내는 중...');
         try {
             await api.requestPasswordReset(email);
             restore();
-            await window.showAlert('가입하신 이메일로 비밀번호 재설정 링크를 발송했습니다.<br>메일함을 확인해 주세요.');
+            await window.showAlert('재설정 링크를 보냈어요\n가입하신 이메일의 메일함을 확인해 주세요.', { tone: 'success', icon: 'mail' });
             form.reset();
             toggleView('login');
         } catch (err) {
@@ -163,7 +214,7 @@ function bindResetForm() {
                 applyResetAvailability();
                 return;
             }
-            await window.showAlert(`발송 실패: ${err.message}`);
+            await window.showAlert(`발송 실패\n${err.message}`);
         }
     });
 }
@@ -171,27 +222,32 @@ function bindResetForm() {
 function bindUpdatePasswordForm() {
     const form = document.getElementById('updatePasswordForm');
     const updateBtn = document.getElementById('updatePwdBtn');
+    const confirmInput = document.getElementById('newPasswordConfirm');
+    confirmInput.addEventListener('input', () => clearFieldError('newPasswordConfirmField', 'updatePasswordError'));
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const newPassword = document.getElementById('newPassword').value;
-        const confirmPassword = document.getElementById('newPasswordConfirm').value;
-        if (newPassword !== confirmPassword) {
-            await window.showAlert('⚠️ 입력하신 두 비밀번호가 일치하지 않습니다.');
+        if (newPassword.length < 8) {
+            showFieldError('newPasswordConfirmField', 'updatePasswordError', '비밀번호는 8자 이상이어야 해요.');
+            return;
+        }
+        if (newPassword !== confirmInput.value) {
+            showFieldError('newPasswordConfirmField', 'updatePasswordError', '두 비밀번호가 일치하지 않아요.');
             return;
         }
 
-        const restore = setButtonLoading(updateBtn, '<i class="fas fa-spinner fa-spin"></i> 변경중...');
+        const restore = setButtonLoading(updateBtn, '변경 중...');
         try {
             await api.confirmPasswordReset(resetToken, newPassword);
             restore();
             resetToken = '';
             form.reset();
-            await window.showAlert('비밀번호가 성공적으로 변경되었습니다!<br>새 비밀번호로 로그인해 주세요.');
+            await window.showAlert('비밀번호를 바꿨어요\n새 비밀번호로 로그인해 주세요.', { tone: 'success' });
             toggleView('login');
         } catch (err) {
             restore();
-            await window.showAlert(`비밀번호 변경 실패: ${err.message}`);
+            showFieldError('newPasswordConfirmField', 'updatePasswordError', err.message);
         }
     });
 }

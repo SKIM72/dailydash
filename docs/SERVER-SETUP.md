@@ -251,6 +251,14 @@ npm run dev:server     # API  → http://127.0.0.1:3000
 npm run dev            # 화면 → http://127.0.0.1:5173  (/api 는 3000 번으로 자동 전달)
 ```
 
+### 화면 디자인 / 아이콘
+
+- 디자인은 Material Design 3 방식의 색상 역할(`--md-*` 변수)을 `style.css` 맨 위에서 정의합니다. 라이트/다크 색은 여기만 고치면 전체에 반영됩니다.
+- 아이콘은 [Iconsax](https://iconsax.io)의 **Bulk**(기본)·**Bold**(선택 상태) 스타일을 씁니다. 무료 아이콘이며 상업적 사용이 가능합니다.
+  - HTML 에서는 `<i data-icon="이름"></i>` (선택 상태는 `data-variant="bold"`) 로 쓰면 빌드할 때 SVG 로 바뀝니다.
+  - JS 에서는 `iconSvg('이름')` / `iconElement('이름')` (`src/shared/icons.js`) 를 씁니다.
+  - 새 아이콘이 필요하면 `scripts/build-icons.mjs` 의 목록에 추가하고 `npm run icons` 를 실행하세요.
+
 ## 11. 문제 해결
 
 | 증상 | 확인할 것 |

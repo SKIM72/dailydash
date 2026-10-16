@@ -1,9 +1,10 @@
-// 화면을 막지 않는 짧은 알림. 확인 버튼을 눌러야 하는 showAlert 대신 성공 안내에 사용한다.
+// 스낵바: 화면을 막지 않는 짧은 알림. 확인 버튼을 눌러야 하는 showAlert 대신 성공 안내에 쓴다.
+import { iconSvg } from './icons.js';
 
 const TONE_ICONS = {
-  success: 'fa-circle-check',
-  danger: 'fa-circle-exclamation',
-  info: 'fa-circle-info'
+  success: 'check',
+  danger: 'danger',
+  info: 'info'
 };
 
 function getContainer() {
@@ -11,7 +12,7 @@ function getContainer() {
   if (!container) {
     container = document.createElement('div');
     container.id = 'toast-container';
-    container.className = 'toast-container';
+    container.className = 'snackbar-host toast-container';
     container.setAttribute('role', 'status');
     container.setAttribute('aria-live', 'polite');
     document.body.appendChild(container);
@@ -21,17 +22,13 @@ function getContainer() {
 
 export function showToast(message, { tone = 'success', duration = 3200, actionLabel = '', onAction = null } = {}) {
   const toast = document.createElement('div');
-  toast.className = `toast toast-${tone}`;
-
-  const icon = document.createElement('i');
-  icon.className = `fas ${TONE_ICONS[tone] || TONE_ICONS.info}`;
-  icon.setAttribute('aria-hidden', 'true');
+  toast.className = `snackbar toast toast-${tone}`;
+  toast.innerHTML = iconSvg(TONE_ICONS[tone] || TONE_ICONS.info, { variant: tone === 'success' ? 'bold' : 'bulk' });
 
   const text = document.createElement('span');
   text.className = 'toast-message';
   text.textContent = message;
-
-  toast.append(icon, text);
+  toast.appendChild(text);
 
   let timer = null;
   const dismiss = () => {

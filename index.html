@@ -2,252 +2,370 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DailyDash - 매출 일계표</title>
-    
+
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#f7f8fc">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="DailyDash">
     <link rel="apple-touch-icon" href="/icon.jpeg">
-    
     <link rel="icon" href="/favicon.png" type="image/png">
     <script>
         (() => {
-            const key = 'dailydash-theme-preference';
-            const options = ['system', 'light', 'dark'];
-            let stored = 'system';
+            let preference = 'system';
+            let scale = 1;
             try {
-                stored = localStorage.getItem(key);
+                const stored = localStorage.getItem('dailydash-theme-preference');
+                if (['system', 'light', 'dark'].includes(stored)) preference = stored;
+                const storedScale = Number(localStorage.getItem('dailydash-text-scale'));
+                if (storedScale >= 0.9 && storedScale <= 1.3) scale = storedScale;
             } catch {
-                stored = 'system';
+                preference = 'system';
             }
-            const preference = options.includes(stored) ? stored : 'system';
             const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
-            document.documentElement.dataset.theme = theme;
-            document.documentElement.dataset.themePreference = preference;
+            const root = document.documentElement;
+            root.dataset.theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+            root.dataset.themePreference = preference;
+            root.style.setProperty('--text-scale', String(scale));
         })();
     </script>
-    
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
-        <header class="header">
-            <div class="logo-title">
-                <img src="/icon.jpeg" alt="DailyDash 로고" class="header-icon">
-                <div class="brand-copy">
-                    <h1>DailyDash</h1>
-                    <span class="version-badge" data-app-version>v0.7.0</span>
-                </div>
-            </div>
-            
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <nav class="tab-menu">
-                    <button id="tabDaily" class="tab-btn active" data-short="일일" aria-label="일일 내역"><i class="fas fa-calendar-day"></i> <span class="btn-text">일일 내역</span></button>
-                    <button id="tabMonthly" class="tab-btn" data-short="월간" aria-label="월간 상세 요약"><i class="fas fa-calendar-alt"></i> <span class="btn-text">월간 상세 요약</span></button>
-                    <button id="tabTotal" class="tab-btn" data-short="통계" aria-label="총 통계 분석"><i class="fas fa-chart-pie"></i> <span class="btn-text">총 통계 분석</span></button>
-                </nav>
-                
-                <button id="myPageBtn" class="btn-secondary" data-short="MY" aria-label="마이페이지" style="margin-top: 0; width: auto; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
-                    <i class="fas fa-user-circle"></i> <span class="btn-text">마이페이지</span>
-                </button>
+<div class="app-shell">
 
-                <button id="logoutBtn" class="btn-danger" data-short="나가기" aria-label="로그아웃" style="padding: 10px 16px; border-radius: 12px; font-size: 0.95rem;">
-                    <i class="fas fa-sign-out-alt"></i> <span class="btn-text">로그아웃</span>
-                </button>
+    <!-- 내비게이션 드로어: 데스크톱은 고정, 태블릿·모바일은 메뉴 버튼으로 여는 임시 패널 -->
+    <aside class="nav-drawer" id="navDrawer" aria-label="주 메뉴">
+        <div class="nav-drawer__brand">
+            <span class="brand-mark"><img src="/icon.jpeg" alt=""></span>
+            <div>
+                <strong>DailyDash</strong>
+                <span class="version-badge" data-app-version>v0.8.0</span>
+            </div>
+            <button type="button" class="icon-btn nav-drawer__close" data-drawer-close aria-label="메뉴 닫기"><i data-icon="close"></i></button>
+        </div>
+        <p class="nav-drawer__section">정산 장부</p>
+        <button type="button" class="nav-item active" id="tabDaily" data-nav="daily" aria-current="page">
+            <i data-icon="daily" class="icon-inactive"></i><i data-icon="daily" data-variant="bold" class="icon-active"></i><span>일일 내역</span>
+        </button>
+        <button type="button" class="nav-item" id="tabMonthly" data-nav="monthly">
+            <i data-icon="monthly" class="icon-inactive"></i><i data-icon="monthly" data-variant="bold" class="icon-active"></i><span>월간 요약</span>
+        </button>
+        <button type="button" class="nav-item" id="tabTotal" data-nav="total">
+            <i data-icon="stats" class="icon-inactive"></i><i data-icon="stats" data-variant="bold" class="icon-active"></i><span>통계 분석</span>
+        </button>
+        <p class="nav-drawer__section">계정</p>
+        <button type="button" class="nav-item" id="myPageBtn" data-action="mypage">
+            <i data-icon="profile"></i><span>마이페이지</span>
+        </button>
+        <button type="button" class="nav-item" data-action="settings">
+            <i data-icon="setting"></i><span>화면 설정</span>
+        </button>
+        <div class="nav-drawer__spacer"></div>
+        <div class="nav-drawer__footer">
+            <button type="button" class="nav-item" id="logoutBtn" data-action="logout">
+                <i data-icon="logout"></i><span>로그아웃</span>
+            </button>
+        </div>
+    </aside>
+    <div class="drawer-scrim" id="drawerScrim" data-drawer-close></div>
+
+    <div class="app-main">
+        <!-- 상단 앱 바 -->
+        <header class="top-app-bar" id="topAppBar">
+            <button type="button" class="icon-btn top-app-bar__menu" data-drawer-open aria-label="메뉴 열기"><i data-icon="menu" data-variant="bold"></i></button>
+            <div class="top-app-bar__titles">
+                <h1 class="top-app-bar__title" id="pageTitle">일일 내역</h1>
+                <p class="top-app-bar__subtitle" id="pageSubtitle">오늘의 매출을 입력하고 확인해요</p>
+            </div>
+            <div class="top-app-bar__actions">
+                <button type="button" class="icon-btn" id="refreshViewBtn" aria-label="새로고침" title="새로고침"><i data-icon="refresh"></i></button>
+                <div class="menu-anchor">
+                    <button type="button" class="avatar-btn" id="accountMenuBtn" data-menu-trigger="accountMenu" aria-haspopup="menu" aria-expanded="false" aria-label="계정 메뉴">
+                        <span id="avatarInitial">D</span>
+                    </button>
+                    <div class="menu" id="accountMenu" role="menu" hidden>
+                        <div class="menu-header" id="accountMenuEmail"></div>
+                        <button type="button" class="menu-item" role="menuitem" data-action="mypage"><i data-icon="profile"></i>마이페이지</button>
+                        <button type="button" class="menu-item" role="menuitem" data-action="settings"><i data-icon="setting"></i>화면 설정</button>
+                        <div class="menu-divider" role="separator"></div>
+                        <button type="button" class="menu-item menu-item--danger" role="menuitem" data-action="logout"><i data-icon="logout"></i>로그아웃</button>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <main class="main-content" id="viewDaily">
-            <section class="input-section">
-                <div class="date-picker-wrap" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
-                    <label style="margin-bottom: 0;"><i class="far fa-calendar-alt"></i> 기준일 선택</label>
-                    <div class="date-nav">
-                        <button type="button" class="date-nav-btn" id="prevDayBtn" aria-label="전날" title="전날 (Alt+←)"><i class="fas fa-chevron-left"></i></button>
-                        <div class="custom-date-picker">
-                            <i class="far fa-calendar-check calendar-icon"></i>
-                            <span id="dateDisplay">날짜 선택</span>
-                            <input type="date" id="currentDate" required aria-label="기준일">
-                        </div>
-                        <button type="button" class="date-nav-btn" id="nextDayBtn" aria-label="다음날" title="다음날 (Alt+→)"><i class="fas fa-chevron-right"></i></button>
-                        <button type="button" class="date-nav-btn date-nav-today" id="todayBtn">오늘</button>
+        <!-- 배너: 서버 연결 끊김 등 꼭 알아야 할 안내 -->
+        <div class="app-banners" id="appBanners">
+            <section id="networkBanner" class="banner banner--error hidden-view" role="alert">
+                <span class="banner__icon"><i data-icon="offline"></i></span>
+                <div class="banner__content">
+                    <div class="banner__head"><strong>서버에 연결할 수 없어요</strong></div>
+                    <p class="banner__text" id="networkBannerText">집 서버가 꺼져 있거나 인터넷 연결이 불안정할 수 있어요. 입력한 내용은 저장되지 않았을 수 있습니다.</p>
+                    <div class="banner__actions"><button type="button" class="btn btn-text" id="networkRetryBtn"><i data-icon="refresh"></i>다시 시도</button></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ============ 일일 내역 ============ -->
+        <main class="page view" id="viewDaily">
+            <div class="toolbar">
+                <div class="date-nav">
+                    <button type="button" class="icon-btn icon-btn--outlined" id="prevDayBtn" aria-label="전날" title="전날 (Alt+←)"><i data-icon="arrow-left" data-variant="bold"></i></button>
+                    <label class="date-field">
+                        <i data-icon="calendar"></i>
+                        <span id="dateDisplay">날짜 선택</span>
+                        <input type="date" id="currentDate" required aria-label="기준일">
+                    </label>
+                    <button type="button" class="icon-btn icon-btn--outlined" id="nextDayBtn" aria-label="다음날" title="다음날 (Alt+→)"><i data-icon="arrow-right" data-variant="bold"></i></button>
+                    <button type="button" class="chip" id="todayBtn">오늘</button>
+                </div>
+            </div>
+
+            <div class="daily-layout">
+                <div class="daily-main">
+                    <div class="stat-grid daily-kpi-cards">
+                        <article class="stat-card stat-card--hero">
+                            <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="sales"></i></span><p class="stat-card__label" id="dailySalesLabel">오늘 총매출</p></div>
+                            <p class="stat-card__value"><span id="dailyTotalSales">0</span><small>원</small></p>
+                        </article>
+                        <article class="stat-card tone-neutral">
+                            <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="wallet"></i></span><p class="stat-card__label">순현금 흐름</p></div>
+                            <p class="stat-card__value"><span id="dailyNetCash">0</span><small>원</small></p>
+                        </article>
+                        <article class="stat-card tone-people">
+                            <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="people"></i></span><p class="stat-card__label">방문 인원</p></div>
+                            <p class="stat-card__value"><span id="dailyTotalPeople">0</span><small>명</small></p>
+                        </article>
+                        <article class="stat-card tone-expense">
+                            <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="expense"></i></span><p class="stat-card__label">현금 지출</p></div>
+                            <p class="stat-card__value"><span id="dailyTotalExpense">0</span><small>원</small></p>
+                        </article>
                     </div>
+
+                    <section id="dailyQualityPanel" class="banner quality-panel quality-neutral" aria-live="polite">
+                        <span class="banner__icon"><i data-icon="shield"></i></span>
+                        <div class="banner__content">
+                            <div class="banner__head">
+                                <strong>입력 점검</strong>
+                                <span id="dailyQualityStatus" class="quality-badge quality-neutral">조회 전</span>
+                            </div>
+                            <div id="dailyQualityList" class="quality-list">
+                                <p>오늘 내역을 불러오면 입력값 조합을 자동 점검합니다.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card card--outlined tx-card" aria-labelledby="txCardTitle">
+                        <div class="section-head">
+                            <h2 id="txCardTitle"><i data-icon="receipt"></i><span id="txCardTitleText">오늘의 내역</span></h2>
+                            <span class="chip chip--static" id="txCountChip">0건</span>
+                        </div>
+                        <div class="table-wrap">
+                            <table id="transactionTable">
+                                <thead>
+                                    <tr><th>No.</th><th>적요</th><th>인원</th><th>수입(현금)</th><th>현금지출</th><th>카드수입</th><th>비고1</th><th>비고2</th><th>관리</th></tr>
+                                </thead>
+                                <tbody id="tableBody">
+                                    <tr><td colspan="9" class="empty-msg">데이터를 불러오는 중...</td></tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="total-row"><td colspan="2">합계</td><td id="totalCount">0</td><td id="totalCashIn">0</td><td id="totalCashOut">0</td><td id="totalCardIn">0</td><td colspan="3"></td></tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <ul class="list tx-list" id="txList" aria-label="오늘의 내역 목록"></ul>
+                    </section>
+
+                    <section class="card card--outlined note-card" aria-labelledby="noteCardTitle">
+                        <div class="section-head">
+                            <h2 id="noteCardTitle"><i data-icon="note"></i>일일 특기사항</h2>
+                            <span id="noteStatus" class="note-status" aria-live="polite"></span>
+                        </div>
+                        <div class="field">
+                            <textarea id="dailyNote" rows="3" placeholder="오늘의 특기사항을 입력하세요"></textarea>
+                            <label for="dailyNote">특기사항 (예: 콩 수확)</label>
+                        </div>
+                        <div class="card-actions">
+                            <button type="button" id="saveNoteBtn" class="btn btn-tonal"><i data-icon="save"></i>특기사항 저장</button>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="section-header">
-                    <h2 id="transactionFormTitle"><i class="fas fa-plus-circle"></i> 내역 추가</h2>
-                    <button type="button" id="cancelEditBtn" class="btn-cancel-edit hidden-view"><i class="fas fa-xmark"></i> 수정 취소</button>
-                </div>
-
-                <form id="transactionForm">
-                    <div class="form-group">
-                        <label for="desc">적요 (현금 & 카드)</label>
-                        <input type="text" id="desc" placeholder="예: 미숫가루, 돌배즙" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="count">인원</label>
-                            <input type="text" id="count" inputmode="numeric" autocomplete="off" placeholder="인원수 입력">
+                <!-- 입력 폼: 데스크톱은 오른쪽 카드, 모바일은 FAB 로 여는 바텀시트 -->
+                <section class="card card--outlined entry-panel" id="entryPanel" aria-labelledby="transactionFormTitle">
+                    <span class="entry-panel__handle" aria-hidden="true"></span>
+                    <div class="section-head">
+                        <h2 id="transactionFormTitle"><i data-icon="add-circle"></i>내역 추가</h2>
+                        <div class="section-head__actions">
+                            <button type="button" id="cancelEditBtn" class="btn btn-text hidden-view">수정 취소</button>
+                            <button type="button" class="icon-btn entry-panel__close" data-sheet-close aria-label="입력창 닫기"><i data-icon="close"></i></button>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="cashIn">현금 수입</label>
-                            <input type="text" id="cashIn" inputmode="numeric" autocomplete="off" placeholder="현금 금액 입력">
+                    <span class="chip chip--static entry-panel__date" id="entryDateChip">기준일</span>
+
+                    <form id="transactionForm" novalidate>
+                        <div class="field-group">
+                            <div class="field field--lead">
+                                <i data-icon="note" class="field__lead"></i>
+                                <input type="text" id="desc" placeholder="예: 미숫가루, 돌배즙" autocomplete="off" required>
+                                <label for="desc">적요 (현금 & 카드)</label>
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <div class="field field--lead">
+                                <i data-icon="people" class="field__lead"></i>
+                                <input type="text" id="count" inputmode="numeric" autocomplete="off" placeholder="0">
+                                <label for="count">인원</label>
+                                <span class="field__suffix">명</span>
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <div class="field field--lead">
+                                <i data-icon="cash" class="field__lead"></i>
+                                <input type="text" id="cashIn" inputmode="numeric" autocomplete="off" placeholder="0">
+                                <label for="cashIn">현금 수입</label>
+                                <span class="field__suffix">원</span>
+                            </div>
                             <div class="quick-amounts" aria-label="현금 수입 빠른 입력">
-                                <button type="button" class="quick-amount-btn" data-target="cashIn" data-amount="5000">+5천</button>
-                                <button type="button" class="quick-amount-btn" data-target="cashIn" data-amount="10000">+1만</button>
-                                <button type="button" class="quick-amount-btn" data-target="cashIn" data-amount="50000">+5만</button>
-                                <button type="button" class="quick-amount-btn quick-clear-btn" data-target="cashIn" data-clear="true">지움</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cashIn" data-amount="5000">+5천</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cashIn" data-amount="10000">+1만</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cashIn" data-amount="50000">+5만</button>
+                                <button type="button" class="chip quick-amount-btn quick-clear-btn" data-target="cashIn" data-clear="true">지움</button>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="cardIn">카드 수입</label>
-                            <input type="text" id="cardIn" inputmode="numeric" autocomplete="off" placeholder="카드 금액 입력">
+                        <div class="field-group">
+                            <div class="field field--lead">
+                                <i data-icon="card" class="field__lead"></i>
+                                <input type="text" id="cardIn" inputmode="numeric" autocomplete="off" placeholder="0">
+                                <label for="cardIn">카드 수입</label>
+                                <span class="field__suffix">원</span>
+                            </div>
                             <div class="quick-amounts" aria-label="카드 수입 빠른 입력">
-                                <button type="button" class="quick-amount-btn" data-target="cardIn" data-amount="5000">+5천</button>
-                                <button type="button" class="quick-amount-btn" data-target="cardIn" data-amount="10000">+1만</button>
-                                <button type="button" class="quick-amount-btn" data-target="cardIn" data-amount="50000">+5만</button>
-                                <button type="button" class="quick-amount-btn quick-clear-btn" data-target="cardIn" data-clear="true">지움</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cardIn" data-amount="5000">+5천</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cardIn" data-amount="10000">+1만</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cardIn" data-amount="50000">+5만</button>
+                                <button type="button" class="chip quick-amount-btn quick-clear-btn" data-target="cardIn" data-clear="true">지움</button>
                             </div>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="cashOut">현금 지출</label>
-                        <input type="text" id="cashOut" inputmode="numeric" autocomplete="off" placeholder="지출 금액 입력">
-                        <div class="quick-amounts" aria-label="현금 지출 빠른 입력">
-                            <button type="button" class="quick-amount-btn" data-target="cashOut" data-amount="5000">+5천</button>
-                            <button type="button" class="quick-amount-btn" data-target="cashOut" data-amount="10000">+1만</button>
-                            <button type="button" class="quick-amount-btn" data-target="cashOut" data-amount="50000">+5만</button>
-                            <button type="button" class="quick-amount-btn quick-clear-btn" data-target="cashOut" data-clear="true">지움</button>
+                        <div class="field-group">
+                            <div class="field field--lead">
+                                <i data-icon="expense" class="field__lead"></i>
+                                <input type="text" id="cashOut" inputmode="numeric" autocomplete="off" placeholder="0">
+                                <label for="cashOut">현금 지출</label>
+                                <span class="field__suffix">원</span>
+                            </div>
+                            <div class="quick-amounts" aria-label="현금 지출 빠른 입력">
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cashOut" data-amount="5000">+5천</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cashOut" data-amount="10000">+1만</button>
+                                <button type="button" class="chip chip--assist quick-amount-btn" data-target="cashOut" data-amount="50000">+5만</button>
+                                <button type="button" class="chip quick-amount-btn quick-clear-btn" data-target="cashOut" data-clear="true">지움</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-group"><label for="remark1">비고 1</label><input type="text" id="remark1" placeholder="추가 내용"></div>
-                    <div class="form-group"><label for="remark2">비고 2</label><input type="text" id="remark2" placeholder="고객 이름 등"></div>
+                        <div class="field-row">
+                            <div class="field">
+                                <input type="text" id="remark1" placeholder="추가 내용">
+                                <label for="remark1">비고 1</label>
+                            </div>
+                            <div class="field">
+                                <input type="text" id="remark2" placeholder="고객 이름 등">
+                                <label for="remark2">비고 2</label>
+                            </div>
+                        </div>
 
-                    <div class="entry-preview" aria-live="polite">
-                        <div class="entry-preview-item">
-                            <span>입력 매출</span>
-                            <strong id="entrySalesPreview">0원</strong>
+                        <div class="entry-preview" aria-live="polite">
+                            <div class="entry-preview-item"><span>입력 매출</span><strong id="entrySalesPreview">0원</strong></div>
+                            <div class="entry-preview-item"><span>순현금</span><strong id="entryCashPreview">0원</strong></div>
+                            <div class="entry-preview-item"><span>객단가</span><strong id="entryTicketPreview">0원</strong></div>
                         </div>
-                        <div class="entry-preview-item">
-                            <span>순현금</span>
-                            <strong id="entryCashPreview">0원</strong>
-                        </div>
-                        <div class="entry-preview-item">
-                            <span>객단가</span>
-                            <strong id="entryTicketPreview">0원</strong>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" id="submitTransactionBtn" class="btn-submit"><i class="fas fa-check"></i> 입력하기</button>
-                </form>
-            </section>
 
-            <section class="dashboard-section">
-                <div class="section-header"><h2><i class="fas fa-list-ul"></i> 오늘의 내역</h2></div>
-                <div class="summary-cards daily-kpi-cards">
-                    <div class="card card-primary"><h3>오늘 총매출</h3><p id="dailyTotalSales" class="amount">0</p></div>
-                    <div class="card card-dark"><h3>순현금 흐름</h3><p id="dailyNetCash" class="amount">0</p></div>
-                    <div class="card card-purple"><h3>방문 인원</h3><p id="dailyTotalPeople" class="amount">0</p></div>
-                    <div class="card card-danger"><h3>현금 지출</h3><p id="dailyTotalExpense" class="amount">0</p></div>
-                </div>
-                <div id="dailyQualityPanel" class="quality-panel quality-neutral">
-                    <div class="quality-panel-header">
-                        <h3><i class="fas fa-shield-alt"></i> 입력 점검</h3>
-                        <span id="dailyQualityStatus" class="quality-badge quality-neutral">조회 전</span>
-                    </div>
-                    <div id="dailyQualityList" class="quality-list">
-                        <p>오늘 내역을 불러오면 입력값 조합을 자동 점검합니다.</p>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table id="transactionTable">
-                        <thead>
-                            <tr><th>No.</th><th>적요</th><th>인원</th><th>수입(현금)</th><th>현금지출</th><th>카드수입</th><th>비고1</th><th>비고2</th><th>관리</th></tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <tr><td colspan="9" class="empty-msg">데이터를 불러오는 중...</td></tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="total-row"><td colspan="2">합계</td><td id="totalCount">0</td><td id="totalCashIn">0</td><td id="totalCashOut">0</td><td id="totalCardIn">0</td><td colspan="3"></td></tr>
-                        </tfoot>
-                    </table>
-                </div>
-                
-                <div class="daily-note-section">
-                    <div class="note-label-row">
-                        <label for="dailyNote"><i class="fas fa-thumbtack"></i> 일일 특기사항</label>
-                        <span id="noteStatus" class="note-status" aria-live="polite"></span>
-                    </div>
-                    <textarea id="dailyNote" rows="3" placeholder="오늘의 특기사항을 입력하세요 (예: 콩 수확)"></textarea>
-                    <button id="saveNoteBtn" class="btn-secondary"><i class="fas fa-save"></i> 특기사항 저장</button>
-                </div>
-            </section>
+                        <button type="submit" id="submitTransactionBtn" class="btn btn-filled btn--lg btn--block"><i data-icon="check"></i>입력하기</button>
+                    </form>
+                </section>
+            </div>
         </main>
 
-        <main class="main-content" id="viewMonthly" style="display: none; flex-direction: column;">
-            <section class="dashboard-section stats-overview-section">
-                <div class="section-header">
-                    <h2 style="margin: 0;"><i class="fas fa-calendar-alt"></i> 월간 상세 요약</h2>
-                    <div class="custom-date-picker" style="min-width: 180px;">
-                        <i class="far fa-calendar calendar-icon"></i>
+        <!-- ============ 월간 요약 ============ -->
+        <main class="page view hidden-view" id="viewMonthly">
+            <div class="toolbar">
+                <div class="month-nav">
+                    <button type="button" class="icon-btn icon-btn--outlined" id="prevMonthBtn" aria-label="이전 달"><i data-icon="arrow-left" data-variant="bold"></i></button>
+                    <label class="date-field">
+                        <i data-icon="calendar"></i>
                         <span id="monthDisplay">월 선택</span>
-                        <input type="month" id="currentMonth" required>
-                    </div>
+                        <input type="month" id="currentMonth" required aria-label="조회 월">
+                    </label>
+                    <button type="button" class="icon-btn icon-btn--outlined" id="nextMonthBtn" aria-label="다음 달"><i data-icon="arrow-right" data-variant="bold"></i></button>
                 </div>
-                <div class="summary-cards stats-primary-grid">
-                    <div class="card card-primary"><h3>총 매출 (현금+카드)</h3><p id="monthTotalSales" class="amount">0</p></div>
-                    <div class="card card-success"><h3>현금 누적</h3><p id="monthTotalCash" class="amount">0</p></div>
-                    <div class="card card-warning"><h3>카드 누적</h3><p id="monthTotalCard" class="amount">0</p></div>
-                    <div class="card card-danger"><h3>현금 지출</h3><p id="monthTotalExpense" class="amount">0</p></div>
-                    <div class="card card-dark"><h3>순매출</h3><p id="monthNetSales" class="amount">0</p></div>
-                    <div class="card card-purple"><h3>총 방문 인원</h3><p id="monthTotalCount" class="amount count">0</p></div>
-                </div>
+            </div>
 
-                <div class="summary-cards stats-secondary-grid">
-                    <div class="card" style="border-left: 4px solid #6366f1;"><h3>영업일 평균 매출액</h3><p id="monthAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
-                    <div class="card" style="border-left: 4px solid #111827;"><h3>객단가</h3><p id="monthAvgTicket" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
-                    <div class="card" style="border-left: 4px solid #3182f6;"><h3>전월 대비</h3><p id="monthCompareSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">-</p></div>
-                    <div class="card" style="border-left: 4px solid #10b981;"><h3>최고 매출 달성일</h3><p id="monthMaxSalesDay" class="amount" style="font-size:1.3rem; color:var(--text-main);">-</p></div>
-                    <div class="card" style="border-left: 4px solid #f59e0b;"><h3>현금 결제 비중</h3><p id="monthCashRatio" class="amount" style="font-size:1.4rem; color:var(--text-main);">0%</p></div>
-                    <div class="card" style="border-left: 4px solid #0f172a;"><h3>입력/영업일 수</h3><p id="monthOperatingDays" class="amount" style="font-size:1.4rem; color:var(--text-main);">0일</p></div>
-                </div>
-                <div class="insight-panel">
-                    <div class="insight-title"><i class="fas fa-lightbulb"></i> 월간 인사이트</div>
-                    <ul id="monthInsightList"><li>월을 선택하면 매출 흐름을 요약합니다.</li></ul>
-                </div>
-                <div class="analysis-panels">
-                    <section class="analysis-panel">
-                        <div class="analysis-panel-title"><i class="fas fa-calendar-week"></i> 요일 패턴</div>
-                        <div id="monthWeekdaySignals" class="signal-grid">
-                            <div class="empty-compact">월을 선택하면 요일 패턴을 분석합니다.</div>
-                        </div>
-                    </section>
-                    <section class="analysis-panel">
-                        <div class="analysis-panel-title"><i class="fas fa-ranking-star"></i> 적요 TOP 5</div>
-                        <div id="monthDescriptionRanking" class="ranking-list">
-                            <div class="empty-compact">월을 선택하면 적요별 매출을 분석합니다.</div>
-                        </div>
-                    </section>
-                </div>
+            <div class="stat-grid stats-primary-grid">
+                <article class="stat-card stat-card--hero">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="sales"></i></span><p class="stat-card__label">총 매출 (현금+카드)</p></div>
+                    <p class="stat-card__value"><span id="monthTotalSales">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-cash">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="cash"></i></span><p class="stat-card__label">현금 누적</p></div>
+                    <p class="stat-card__value"><span id="monthTotalCash">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-card">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="card"></i></span><p class="stat-card__label">카드 누적</p></div>
+                    <p class="stat-card__value"><span id="monthTotalCard">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-expense">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="expense"></i></span><p class="stat-card__label">현금 지출</p></div>
+                    <p class="stat-card__value"><span id="monthTotalExpense">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-neutral">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="wallet"></i></span><p class="stat-card__label">순매출</p></div>
+                    <p class="stat-card__value"><span id="monthNetSales">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-people">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="people"></i></span><p class="stat-card__label">총 방문 인원</p></div>
+                    <p class="stat-card__value"><span id="monthTotalCount">0</span><small>명</small></p>
+                </article>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric"><span class="metric__icon"><i data-icon="chart"></i></span><div><p class="metric__label">영업일 평균 매출</p><p class="metric__value" id="monthAvgSales">0</p></div></div>
+                <div class="metric tone-neutral"><span class="metric__icon"><i data-icon="receipt"></i></span><div><p class="metric__label">객단가</p><p class="metric__value" id="monthAvgTicket">0</p></div></div>
+                <div class="metric"><span class="metric__icon"><i data-icon="trend-up"></i></span><div><p class="metric__label">전월 대비</p><p class="metric__value" id="monthCompareSales">-</p></div></div>
+                <div class="metric tone-card"><span class="metric__icon"><i data-icon="crown"></i></span><div><p class="metric__label">최고 매출 달성일</p><p class="metric__value" id="monthMaxSalesDay">-</p></div></div>
+                <div class="metric tone-cash"><span class="metric__icon"><i data-icon="ratio"></i></span><div><p class="metric__label">현금 결제 비중</p><p class="metric__value" id="monthCashRatio">0%</p></div></div>
+                <div class="metric tone-people"><span class="metric__icon"><i data-icon="calendar-search"></i></span><div><p class="metric__label">입력/영업일 수</p><p class="metric__value" id="monthOperatingDays">0일</p></div></div>
+            </div>
+
+            <section class="card card--outlined insight-panel">
+                <div class="section-head"><h2><i data-icon="insight"></i>월간 인사이트</h2></div>
+                <ul id="monthInsightList"><li>월을 선택하면 매출 흐름을 요약합니다.</li></ul>
             </section>
+
+            <div class="analysis-panels">
+                <section class="card card--outlined analysis-panel">
+                    <div class="section-head"><h2><i data-icon="calendar-search"></i>요일 패턴</h2></div>
+                    <div id="monthWeekdaySignals" class="signal-grid"><div class="empty-compact">월을 선택하면 요일 패턴을 분석합니다.</div></div>
+                </section>
+                <section class="card card--outlined analysis-panel">
+                    <div class="section-head"><h2><i data-icon="ranking"></i>적요 TOP 5</h2></div>
+                    <div id="monthDescriptionRanking" class="ranking-list"><div class="empty-compact">월을 선택하면 적요별 매출을 분석합니다.</div></div>
+                </section>
+            </div>
 
             <details class="fold-section" id="monthlyDetailFold">
                 <summary>
-                    <span class="fold-title"><i class="fas fa-table"></i> 일자별 누적 현황</span>
-                    <span id="monthlyDetailMeta" class="fold-summary-meta">월 선택</span>
+                    <span class="fold-title"><i data-icon="table"></i>일자별 누적 현황</span>
+                    <span class="fold-summary-meta"><span id="monthlyDetailMeta">월 선택</span><i data-icon="arrow-down" data-variant="bold"></i></span>
                 </summary>
                 <div class="fold-body">
                     <div class="fold-actions">
-                        <button id="downloadExcelBtn" class="btn-secondary btn-excel"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
+                        <button type="button" id="downloadExcelBtn" class="btn btn-tonal btn-excel"><i data-icon="download"></i>엑셀 다운로드</button>
                     </div>
-                    <div class="table-container">
+                    <div class="table-wrap">
                         <table id="monthlyTable">
                             <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
                             <tbody id="monthlyTableBody"><tr><td colspan="11" class="empty-msg">데이터가 없습니다.</td></tr></tbody>
@@ -257,122 +375,126 @@
             </details>
         </main>
 
-        <main class="main-content" id="viewTotal" style="display: none; flex-direction: column;">
-            <section class="dashboard-section stats-overview-section">
-                <div class="section-header" style="flex-wrap: wrap; gap: 15px;">
-                    <h2><i class="fas fa-chart-pie"></i> 기간별 총 통계 분석</h2>
-                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <div class="custom-date-picker" style="min-width: 170px;">
-                            <i class="far fa-calendar-alt calendar-icon"></i>
-                            <span id="startDateDisplay">시작일 선택</span>
-                            <input type="date" id="totalStartDate" required>
-                        </div>
-                        <span style="font-weight: 600; color: var(--text-muted);">~</span>
-                        <div class="custom-date-picker" style="min-width: 170px;">
-                            <i class="far fa-calendar-alt calendar-icon"></i>
-                            <span id="endDateDisplay">종료일 선택</span>
-                            <input type="date" id="totalEndDate" required>
-                        </div>
-                        <button id="loadTotalBtn" class="btn-submit" style="margin-top:0; width:auto; padding: 11px 20px; border-radius:12px;"><i class="fas fa-search"></i> 조회하기</button>
-                    </div>
+        <!-- ============ 통계 분석 ============ -->
+        <main class="page view hidden-view" id="viewTotal">
+            <section class="card card--outlined range-card">
+                <div class="range-fields">
+                    <label class="date-field">
+                        <i data-icon="calendar"></i>
+                        <span id="startDateDisplay">시작일 선택</span>
+                        <input type="date" id="totalStartDate" required aria-label="시작일">
+                    </label>
+                    <span class="range-fields__sep">~</span>
+                    <label class="date-field">
+                        <i data-icon="calendar"></i>
+                        <span id="endDateDisplay">종료일 선택</span>
+                        <input type="date" id="totalEndDate" required aria-label="종료일">
+                    </label>
+                    <button type="button" id="loadTotalBtn" class="btn btn-filled"><i data-icon="search"></i>조회하기</button>
                 </div>
-                <div class="range-presets" role="group" aria-label="빠른 기간 선택">
-                    <button type="button" class="range-preset-btn" data-range-preset="thisMonth">이번 달</button>
-                    <button type="button" class="range-preset-btn" data-range-preset="lastMonth">지난 달</button>
-                    <button type="button" class="range-preset-btn" data-range-preset="last7">최근 7일</button>
-                    <button type="button" class="range-preset-btn" data-range-preset="last30">최근 30일</button>
-                    <button type="button" class="range-preset-btn" data-range-preset="last90">최근 90일</button>
-                    <button type="button" class="range-preset-btn" data-range-preset="thisYear">올해</button>
-                </div>
-
-                <div class="summary-cards stats-primary-grid">
-                    <div class="card card-primary"><h3>지정 기간 총 매출</h3><p id="rangeTotalSales" class="amount">0</p></div>
-                    <div class="card card-success"><h3>현금 매출 합계</h3><p id="rangeTotalCash" class="amount">0</p></div>
-                    <div class="card card-warning"><h3>카드 매출 합계</h3><p id="rangeTotalCard" class="amount">0</p></div>
-                    <div class="card card-danger"><h3>현금 지출 합계</h3><p id="rangeTotalExpense" class="amount">0</p></div>
-                    <div class="card card-dark"><h3>기간 순매출</h3><p id="rangeNetSales" class="amount">0</p></div>
-                    <div class="card card-purple"><h3>총 누적 인원</h3><p id="rangeTotalCount" class="amount count">0</p></div>
-                </div>
-                
-                <div class="summary-cards stats-secondary-grid">
-                    <div class="card" style="border-left: 4px solid #6366f1;"><h3>영업일 평균 매출</h3><p id="rangeAvgSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
-                    <div class="card" style="border-left: 4px solid #111827;"><h3>객단가</h3><p id="rangeAvgTicket" class="amount" style="font-size:1.4rem; color:var(--text-main);">0</p></div>
-                    <div class="card" style="border-left: 4px solid #3182f6;"><h3>이전 동기간 대비</h3><p id="rangeCompareSales" class="amount" style="font-size:1.4rem; color:var(--text-main);">-</p></div>
-                    <div class="card" style="border-left: 4px solid #10b981;"><h3>기간 내 최고 매출일</h3><p id="rangeMaxSalesDay" class="amount" style="font-size:1.3rem; color:var(--text-main);">-</p></div>
-                    <div class="card" style="border-left: 4px solid #f59e0b;"><h3>현금 결제 비중</h3><p id="rangeCashRatio" class="amount" style="font-size:1.4rem; color:var(--text-main);">0%</p></div>
-                    <div class="card" style="border-left: 4px solid #0f172a;"><h3>입력/영업일 수</h3><p id="rangeOperatingDays" class="amount" style="font-size:1.4rem; color:var(--text-main);">0일</p></div>
-                </div>
-                <div class="insight-panel">
-                    <div class="insight-title"><i class="fas fa-lightbulb"></i> 기간 인사이트</div>
-                    <ul id="rangeInsightList"><li>기간을 조회하면 매출 흐름을 요약합니다.</li></ul>
-                </div>
-                <div class="analysis-panels">
-                    <section class="analysis-panel">
-                        <div class="analysis-panel-title"><i class="fas fa-calendar-week"></i> 요일 패턴</div>
-                        <div id="rangeWeekdaySignals" class="signal-grid">
-                            <div class="empty-compact">기간을 조회하면 요일 패턴을 분석합니다.</div>
-                        </div>
-                    </section>
-                    <section class="analysis-panel">
-                        <div class="analysis-panel-title"><i class="fas fa-ranking-star"></i> 적요 TOP 5</div>
-                        <div id="rangeDescriptionRanking" class="ranking-list">
-                            <div class="empty-compact">기간을 조회하면 적요별 매출을 분석합니다.</div>
-                        </div>
-                    </section>
+                <div class="chip-set range-presets" role="group" aria-label="빠른 기간 선택">
+                    <button type="button" class="chip" data-range-preset="thisMonth">이번 달</button>
+                    <button type="button" class="chip" data-range-preset="lastMonth">지난 달</button>
+                    <button type="button" class="chip" data-range-preset="last7">최근 7일</button>
+                    <button type="button" class="chip" data-range-preset="last30">최근 30일</button>
+                    <button type="button" class="chip" data-range-preset="last90">최근 90일</button>
+                    <button type="button" class="chip" data-range-preset="thisYear">올해</button>
+                    <button type="button" class="chip" data-range-preset="last365">최근 1년</button>
                 </div>
             </section>
 
+            <div class="stat-grid stats-primary-grid">
+                <article class="stat-card stat-card--hero">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="sales"></i></span><p class="stat-card__label">기간 총 매출</p></div>
+                    <p class="stat-card__value"><span id="rangeTotalSales">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-cash">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="cash"></i></span><p class="stat-card__label">현금 매출 합계</p></div>
+                    <p class="stat-card__value"><span id="rangeTotalCash">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-card">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="card"></i></span><p class="stat-card__label">카드 매출 합계</p></div>
+                    <p class="stat-card__value"><span id="rangeTotalCard">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-expense">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="expense"></i></span><p class="stat-card__label">현금 지출 합계</p></div>
+                    <p class="stat-card__value"><span id="rangeTotalExpense">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-neutral">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="wallet"></i></span><p class="stat-card__label">기간 순매출</p></div>
+                    <p class="stat-card__value"><span id="rangeNetSales">0</span><small>원</small></p>
+                </article>
+                <article class="stat-card tone-people">
+                    <div class="stat-card__top"><span class="stat-card__icon"><i data-icon="people"></i></span><p class="stat-card__label">총 누적 인원</p></div>
+                    <p class="stat-card__value"><span id="rangeTotalCount">0</span><small>명</small></p>
+                </article>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric"><span class="metric__icon"><i data-icon="chart"></i></span><div><p class="metric__label">영업일 평균 매출</p><p class="metric__value" id="rangeAvgSales">0</p></div></div>
+                <div class="metric tone-neutral"><span class="metric__icon"><i data-icon="receipt"></i></span><div><p class="metric__label">객단가</p><p class="metric__value" id="rangeAvgTicket">0</p></div></div>
+                <div class="metric"><span class="metric__icon"><i data-icon="trend-up"></i></span><div><p class="metric__label">이전 동기간 대비</p><p class="metric__value" id="rangeCompareSales">-</p></div></div>
+                <div class="metric tone-card"><span class="metric__icon"><i data-icon="crown"></i></span><div><p class="metric__label">기간 내 최고 매출일</p><p class="metric__value" id="rangeMaxSalesDay">-</p></div></div>
+                <div class="metric tone-cash"><span class="metric__icon"><i data-icon="ratio"></i></span><div><p class="metric__label">현금 결제 비중</p><p class="metric__value" id="rangeCashRatio">0%</p></div></div>
+                <div class="metric tone-people"><span class="metric__icon"><i data-icon="calendar-search"></i></span><div><p class="metric__label">입력/영업일 수</p><p class="metric__value" id="rangeOperatingDays">0일</p></div></div>
+            </div>
+
+            <section class="card card--outlined insight-panel">
+                <div class="section-head"><h2><i data-icon="insight"></i>기간 인사이트</h2></div>
+                <ul id="rangeInsightList"><li>기간을 조회하면 매출 흐름을 요약합니다.</li></ul>
+            </section>
+
+            <div class="analysis-panels">
+                <section class="card card--outlined analysis-panel">
+                    <div class="section-head"><h2><i data-icon="calendar-search"></i>요일 패턴</h2></div>
+                    <div id="rangeWeekdaySignals" class="signal-grid"><div class="empty-compact">기간을 조회하면 요일 패턴을 분석합니다.</div></div>
+                </section>
+                <section class="card card--outlined analysis-panel">
+                    <div class="section-head"><h2><i data-icon="ranking"></i>적요 TOP 5</h2></div>
+                    <div id="rangeDescriptionRanking" class="ranking-list"><div class="empty-compact">기간을 조회하면 적요별 매출을 분석합니다.</div></div>
+                </section>
+            </div>
+
             <details class="fold-section" id="rangeChartFold">
                 <summary>
-                    <span class="fold-title"><i class="fas fa-chart-bar"></i> 매출 흐름 분석</span>
-                    <span id="rangeChartMeta" class="fold-summary-meta">기간 선택</span>
+                    <span class="fold-title"><i data-icon="chart"></i>매출 흐름 분석</span>
+                    <span class="fold-summary-meta"><span id="rangeChartMeta">기간 선택</span><i data-icon="arrow-down" data-variant="bold"></i></span>
                 </summary>
                 <div class="fold-body">
                     <div class="analytics-dashboard-grid">
-                        <section class="dashboard-section inner-analysis-section">
-                            <div class="section-header chart-section-header">
+                        <section class="card card--filled">
+                            <div class="section-head">
                                 <div>
-                                    <h2><i class="fas fa-chart-bar"></i> 매출 추이</h2>
+                                    <h2><i data-icon="chart"></i>매출 추이</h2>
                                     <p id="trendChartCaption" class="chart-caption">현금+카드 총매출, 7일 평균, 지출 흐름을 함께 봅니다.</p>
                                 </div>
-                                <div class="chart-mode-control" role="radiogroup" aria-label="차트 보기 방식">
-                                    <button type="button" class="chart-mode-btn active" role="radio" aria-checked="true" data-chart-mode="sales">매출 중심</button>
-                                    <button type="button" class="chart-mode-btn" role="radio" aria-checked="false" data-chart-mode="payment">결제수단</button>
-                                    <button type="button" class="chart-mode-btn" role="radio" aria-checked="false" data-chart-mode="people">방문객</button>
-                                </div>
+                            </div>
+                            <div class="tabs tabs--secondary chart-mode-control" role="tablist" aria-label="차트 보기 방식">
+                                <button type="button" class="tab chart-mode-btn active" role="tab" aria-selected="true" data-chart-mode="sales"><i data-icon="sales"></i>매출 중심</button>
+                                <button type="button" class="tab chart-mode-btn" role="tab" aria-selected="false" data-chart-mode="payment"><i data-icon="card"></i>결제수단</button>
+                                <button type="button" class="tab chart-mode-btn" role="tab" aria-selected="false" data-chart-mode="people"><i data-icon="people"></i>방문객</button>
                             </div>
                             <div id="trendSummaryStrip" class="chart-summary-strip">
                                 <div class="empty-compact">기간을 조회하면 차트 핵심 지표를 요약합니다.</div>
                             </div>
-                            <div class="chart-wrap">
-                                <canvas id="totalTrendChart"></canvas>
-                            </div>
+                            <div class="chart-wrap"><canvas id="totalTrendChart"></canvas></div>
                         </section>
-                        <section class="dashboard-section inner-analysis-section">
-                            <div class="section-header"><h2><i class="fas fa-calendar-week"></i> 요일별 기여도</h2></div>
-                            <div id="weekdayContributionWrap" class="weekday-wrap">
-                                <div class="empty-compact">데이터 조회 전</div>
-                            </div>
+                        <section class="card card--filled">
+                            <div class="section-head"><h2><i data-icon="calendar-search"></i>요일별 기여도</h2></div>
+                            <div id="weekdayContributionWrap" class="weekday-wrap"><div class="empty-compact">데이터 조회 전</div></div>
                         </section>
                     </div>
-                    <section class="chart-flow-panel">
+                    <section class="card card--filled chart-flow-panel">
                         <div class="flow-panel-header">
                             <div>
-                                <h2><i class="fas fa-magnifying-glass-chart"></i> 차트 자동 해석</h2>
+                                <h2><i data-icon="graph"></i>차트 자동 해석</h2>
                                 <p>조회된 기간의 매출 집중, 급증/급락, 입력 공백을 자동으로 짚어줍니다.</p>
                             </div>
-                            <div id="rangeFlowBadges" class="flow-badges">
-                                <span class="flow-badge flow-neutral">분석 대기</span>
-                            </div>
+                            <div id="rangeFlowBadges" class="flow-badges"><span class="flow-badge flow-neutral">분석 대기</span></div>
                         </div>
-                        <div id="rangeFlowHighlights" class="flow-highlight-grid">
-                            <div class="empty-compact">기간을 조회하면 차트 주요 지점을 요약합니다.</div>
-                        </div>
+                        <div id="rangeFlowHighlights" class="flow-highlight-grid"><div class="empty-compact">기간을 조회하면 차트 주요 지점을 요약합니다.</div></div>
                         <div id="rangeFlowMessages" class="flow-message-list">
-                            <article class="flow-message flow-neutral">
-                                <strong>분석 대기</strong>
-                                <p>조회하기를 누르면 차트 흐름을 자동으로 분석합니다.</p>
-                            </article>
+                            <article class="flow-message flow-neutral"><strong>분석 대기</strong><p>조회하기를 누르면 차트 흐름을 자동으로 분석합니다.</p></article>
                         </div>
                     </section>
                 </div>
@@ -380,14 +502,14 @@
 
             <details class="fold-section" id="rangeDetailFold">
                 <summary>
-                    <span class="fold-title"><i class="fas fa-list-alt"></i> 상세 일자별 통계</span>
-                    <span id="rangeDetailMeta" class="fold-summary-meta">기간 선택</span>
+                    <span class="fold-title"><i data-icon="table"></i>상세 일자별 통계</span>
+                    <span class="fold-summary-meta"><span id="rangeDetailMeta">기간 선택</span><i data-icon="arrow-down" data-variant="bold"></i></span>
                 </summary>
                 <div class="fold-body">
                     <div class="fold-actions">
-                        <button id="downloadTotalExcelBtn" class="btn-secondary btn-excel"><i class="fas fa-file-excel"></i> 엑셀 다운로드</button>
+                        <button type="button" id="downloadTotalExcelBtn" class="btn btn-tonal btn-excel"><i data-icon="download"></i>엑셀 다운로드</button>
                     </div>
-                    <div class="table-container">
+                    <div class="table-wrap">
                         <table id="totalRangeTable">
                             <thead><tr><th>날짜</th><th>일 인원</th><th>인원 누적</th><th>일 현금</th><th>현금 누적</th><th>일 지출</th><th>지출 누적</th><th>일 카드</th><th>카드 누적</th><th>일 합계</th><th>순매출</th></tr></thead>
                             <tbody id="totalTableBody"><tr><td colspan="11" class="empty-msg">시작일과 종료일을 지정한 후 조회하기를 눌러주세요.</td></tr></tbody>
@@ -398,107 +520,183 @@
         </main>
     </div>
 
-    <div id="myPageModal" class="modal-overlay hidden-view">
-        <div class="input-section modal-panel" role="dialog" aria-modal="true" aria-labelledby="myPageTitle" style="width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; position: relative;">
-            <button type="button" id="closeMyPage" class="modal-close-btn" aria-label="닫기"><i class="fas fa-times"></i></button>
-            <div class="section-header" style="margin-bottom: 20px;"><h2 id="myPageTitle"><i class="fas fa-user-circle"></i> 마이페이지</h2></div>
-            <div class="form-group" style="background: var(--side-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 24px;">
-                <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;"><i class="fas fa-id-badge"></i> 현재 로그인된 계정</label>
-                <span id="loggedInEmail" style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); display: block;">조회 중...</span>
-                <span id="loggedInRole" class="role-badge">-</span>
+    <!-- 하단 내비게이션 (모바일) -->
+    <nav class="bottom-nav" aria-label="주 메뉴">
+        <button type="button" class="bottom-nav__item active" data-nav="daily">
+            <span class="bottom-nav__indicator"><i data-icon="daily" class="icon-inactive"></i><i data-icon="daily" data-variant="bold" class="icon-active"></i></span>
+            <span>일일</span>
+        </button>
+        <button type="button" class="bottom-nav__item" data-nav="monthly">
+            <span class="bottom-nav__indicator"><i data-icon="monthly" class="icon-inactive"></i><i data-icon="monthly" data-variant="bold" class="icon-active"></i></span>
+            <span>월간</span>
+        </button>
+        <button type="button" class="bottom-nav__item" data-nav="total">
+            <span class="bottom-nav__indicator"><i data-icon="stats" class="icon-inactive"></i><i data-icon="stats" data-variant="bold" class="icon-active"></i></span>
+            <span>통계</span>
+        </button>
+        <button type="button" class="bottom-nav__item" data-action="mypage">
+            <span class="bottom-nav__indicator"><i data-icon="profile"></i></span>
+            <span>MY</span>
+        </button>
+    </nav>
+
+    <!-- FAB + 바텀시트 배경 (모바일 입력) -->
+    <button type="button" class="fab" id="entryFab" data-sheet-open aria-controls="entryPanel"><i data-icon="add" data-variant="bold"></i><span>내역 입력</span></button>
+    <div class="sheet-scrim" id="sheetScrim" data-sheet-close></div>
+</div>
+
+<!-- 마이페이지 -->
+<div id="myPageModal" class="dialog-scrim modal-overlay is-fullscreen-mobile hidden-view">
+    <div class="dialog dialog--full" role="dialog" aria-modal="true" aria-labelledby="myPageTitle">
+        <div class="dialog__header">
+            <h2 id="myPageTitle">마이페이지</h2>
+            <button type="button" id="closeMyPage" class="icon-btn" aria-label="닫기"><i data-icon="close"></i></button>
+        </div>
+        <div class="dialog__content">
+            <div class="tabs" role="tablist" id="myPageTabs" aria-label="마이페이지 메뉴">
+                <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="account"><i data-icon="profile"></i>내 정보</button>
+                <button type="button" class="tab" role="tab" aria-selected="false" data-tab="settings"><i data-icon="setting"></i>화면 설정</button>
+                <button type="button" class="tab" role="tab" aria-selected="false" data-tab="history"><i data-icon="clock"></i>작업 이력</button>
+                <button type="button" class="tab hidden-view" role="tab" aria-selected="false" data-tab="users" id="usersTabBtn"><i data-icon="users"></i>사용자 관리</button>
             </div>
-            <div class="theme-setting-panel">
-                <label><i class="fas fa-circle-half-stroke"></i> 화면 모드</label>
-                <div class="theme-segmented-control" role="radiogroup" aria-label="화면 모드 선택">
-                    <button type="button" class="theme-option" role="radio" data-theme-option="system" aria-checked="true">시스템</button>
-                    <button type="button" class="theme-option" role="radio" data-theme-option="light" aria-checked="false">라이트</button>
-                    <button type="button" class="theme-option" role="radio" data-theme-option="dark" aria-checked="false">다크</button>
+
+            <section class="tab-panel" data-tab-panel="account" role="tabpanel">
+                <div class="profile-card">
+                    <span class="profile-card__avatar" id="profileInitial">D</span>
+                    <div>
+                        <p class="profile-card__email" id="loggedInEmail">조회 중...</p>
+                        <span id="loggedInRole" class="role-badge">-</span>
+                    </div>
                 </div>
-            </div>
-            <div class="app-version-panel">
-                <span>앱 버전</span>
-                <strong data-app-version>v0.7.0</strong>
-                <small>릴리스 <span data-app-release-date>2026.10.16</span> · 자체 서버 전환</small>
-            </div>
-            <details class="password-change-panel">
-                <summary><i class="fas fa-key"></i> 비밀번호 변경</summary>
-                <form id="changePasswordForm">
-                    <div class="form-group">
-                        <label for="currentPasswordInput">현재 비밀번호</label>
-                        <input type="password" id="currentPasswordInput" autocomplete="current-password" required>
+                <details class="password-change-panel">
+                    <summary><i data-icon="key"></i>비밀번호 변경<i data-icon="arrow-down" data-variant="bold"></i></summary>
+                    <form id="changePasswordForm">
+                        <div class="field">
+                            <input type="password" id="currentPasswordInput" autocomplete="current-password" placeholder=" " required>
+                            <label for="currentPasswordInput">현재 비밀번호</label>
+                        </div>
+                        <div class="field">
+                            <input type="password" id="newPasswordInput" autocomplete="new-password" minlength="8" placeholder=" " required>
+                            <label for="newPasswordInput">새 비밀번호 (8자 이상)</label>
+                        </div>
+                        <div class="field">
+                            <input type="password" id="newPasswordConfirmInput" autocomplete="new-password" minlength="8" placeholder=" " required>
+                            <label for="newPasswordConfirmInput">새 비밀번호 확인</label>
+                        </div>
+                        <button type="submit" id="changePasswordBtn" class="btn btn-filled btn--block"><i data-icon="check"></i>비밀번호 변경</button>
+                        <p class="panel-hint">변경하면 이 기기를 제외한 다른 기기에서는 다시 로그인해야 합니다.</p>
+                    </form>
+                </details>
+                <div class="app-version-panel">
+                    <i data-icon="info"></i>
+                    <div>
+                        <strong data-app-version>v0.8.0</strong>
+                        <small>릴리스 <span data-app-release-date>2026.10.16</span> · 화면 디자인 개편</small>
                     </div>
-                    <div class="form-group">
-                        <label for="newPasswordInput">새 비밀번호 (8자 이상)</label>
-                        <input type="password" id="newPasswordInput" autocomplete="new-password" minlength="8" required>
+                </div>
+            </section>
+
+            <section class="tab-panel" data-tab-panel="settings" role="tabpanel" hidden>
+                <div class="settings-list">
+                    <div class="setting-row setting-row--stack">
+                        <div class="setting-row__head">
+                            <span class="setting-row__icon"><i data-icon="sun"></i></span>
+                            <div class="setting-row__text"><strong>화면 모드</strong><small>시스템 설정을 따르거나 직접 고를 수 있어요.</small></div>
+                        </div>
+                        <div class="segmented" role="radiogroup" aria-label="화면 모드 선택">
+                            <button type="button" class="segmented__btn theme-option" role="radio" data-theme-option="system" aria-checked="true"><i data-icon="monitor"></i>시스템</button>
+                            <button type="button" class="segmented__btn theme-option" role="radio" data-theme-option="light" aria-checked="false"><i data-icon="sun"></i>라이트</button>
+                            <button type="button" class="segmented__btn theme-option" role="radio" data-theme-option="dark" aria-checked="false"><i data-icon="moon"></i>다크</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="newPasswordConfirmInput">새 비밀번호 확인</label>
-                        <input type="password" id="newPasswordConfirmInput" autocomplete="new-password" minlength="8" required>
+                    <div class="setting-row setting-row--stack">
+                        <div class="setting-row__head">
+                            <span class="setting-row__icon"><i data-icon="text"></i></span>
+                            <div class="setting-row__text"><strong>글자 크기</strong><small>이 기기에서만 적용돼요.</small></div>
+                        </div>
+                        <div class="slider">
+                            <span class="slider__icon slider__icon--sm"><i data-icon="text"></i></span>
+                            <input type="range" id="textScaleSlider" min="90" max="130" step="5" value="100" aria-label="글자 크기">
+                            <span class="slider__icon"><i data-icon="text"></i></span>
+                            <output class="slider__value" id="textScaleValue" for="textScaleSlider">100%</output>
+                        </div>
                     </div>
-                    <button type="submit" id="changePasswordBtn" class="btn-submit"><i class="fas fa-check"></i> 비밀번호 변경</button>
-                    <p class="panel-hint">변경하면 이 기기를 제외한 다른 기기에서는 다시 로그인해야 합니다.</p>
-                </form>
-            </details>
-            <div class="operation-history-panel">
-                <div class="operation-history-header">
-                    <strong><i class="fas fa-clock-rotate-left"></i> <span id="operationHistoryTitle">내 작업 이력</span></strong>
-                    <button type="button" id="refreshOperationHistoryBtn"><i class="fas fa-rotate-right"></i> 새로고침</button>
+                    <div class="setting-row">
+                        <span class="setting-row__icon"><i data-icon="shield"></i></span>
+                        <div class="setting-row__text"><strong>저장 전 확인창</strong><small>내역을 저장하기 전에 한 번 더 확인해요. (이 기기)</small></div>
+                        <label class="switch"><input type="checkbox" id="confirmBeforeSaveSwitch" role="switch" checked aria-label="저장 전 확인창"></label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tab-panel" data-tab-panel="history" role="tabpanel" hidden>
+                <div class="section-head">
+                    <h3><i data-icon="clock"></i><span id="operationHistoryTitle">내 작업 이력</span></h3>
+                    <button type="button" id="refreshOperationHistoryBtn" class="btn btn-text"><i data-icon="refresh"></i>새로고침</button>
                 </div>
                 <div id="operationHistoryList" class="operation-history-list">
                     <p class="operation-history-empty">아직 기록된 작업이 없습니다.</p>
                 </div>
-            </div>
-            <div id="superUserPanel" class="hidden-view">
-                <div class="section-header" style="margin-top: 10px; margin-bottom: 12px;"><h2 style="font-size: 1.05rem; border-bottom-color: var(--secondary);"><i class="fas fa-user-shield" style="color: var(--secondary);"></i> 사용자 관리</h2></div>
-                <div class="table-container" style="max-height: 320px; overflow-y: auto; margin-bottom: 0;">
-                    <table class="user-table">
-                        <thead><tr><th>이메일</th><th>상태</th><th>작업</th></tr></thead>
-                        <tbody id="approvalListBody"><tr><td colspan="3" class="empty-msg" style="padding: 20px !important;">사용자 목록을 불러오는 중...</td></tr></tbody>
-                    </table>
+            </section>
+
+            <section class="tab-panel" data-tab-panel="users" role="tabpanel" hidden>
+                <div id="superUserPanel" class="hidden-view">
+                    <div class="section-head"><h3><i data-icon="admin"></i>사용자 관리</h3></div>
+                    <div class="table-wrap">
+                        <table class="user-table">
+                            <thead><tr><th>이메일</th><th>상태</th><th>작업</th></tr></thead>
+                            <tbody id="approvalListBody"><tr><td colspan="3" class="empty-msg">사용자 목록을 불러오는 중...</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
+</div>
 
-    <div id="dailyDetailModal" class="modal-overlay hidden-view" style="z-index: 9999;">
-        <div class="input-section modal-panel" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle" style="width: 100%; max-width: 720px; max-height: 85vh; overflow-y: auto; position: relative; padding: 28px;">
-            <button type="button" id="closeDetailModal" class="modal-close-btn" aria-label="닫기"><i class="fas fa-times"></i></button>
-            <div class="section-header" style="margin-bottom: 16px;">
-                <h2 id="detailModalTitle"><i class="fas fa-info-circle"></i> <span id="detailModalTitleDate">0000-00-00</span> 건별 상세 내역 명세</h2>
-                <button type="button" id="detailGoToDayBtn" class="btn-cancel-edit"><i class="fas fa-pen-to-square"></i> 이 날짜 입력 화면으로</button>
+<!-- 일자별 상세 -->
+<div id="dailyDetailModal" class="dialog-scrim modal-overlay is-fullscreen-mobile hidden-view">
+    <div class="dialog dialog--full" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+        <div class="dialog__header">
+            <h2 id="detailModalTitle"><span id="detailModalTitleDate">0000-00-00</span> 상세 내역</h2>
+            <button type="button" id="closeDetailModal" class="icon-btn" aria-label="닫기"><i data-icon="close"></i></button>
+        </div>
+        <div class="dialog__content">
+            <div class="toolbar detail-toolbar">
+                <span class="chip chip--static" id="detailCountChip">0건</span>
+                <button type="button" id="detailGoToDayBtn" class="btn btn-tonal"><i data-icon="edit"></i>이 날짜 입력 화면으로</button>
             </div>
-            <div class="table-container" style="margin-bottom: 0;">
+            <div class="table-wrap detail-table">
                 <table>
-                    <thead>
-                        <tr><th>No.</th><th>적요</th><th>인원</th><th>수입(현금)</th><th>현금지출</th><th>카드수입</th><th>비고1</th><th>비고2</th></tr>
-                    </thead>
-                    <tbody id="detailModalTableBody">
-                        <tr><td colspan="8" class="empty-msg">데이터 로드 중...</td></tr>
-                    </tbody>
+                    <thead><tr><th>No.</th><th>적요</th><th>인원</th><th>수입(현금)</th><th>현금지출</th><th>카드수입</th><th>비고1</th><th>비고2</th></tr></thead>
+                    <tbody id="detailModalTableBody"><tr><td colspan="8" class="empty-msg">데이터 로드 중...</td></tr></tbody>
                 </table>
             </div>
+            <ul class="list tx-list detail-list" id="detailModalList"></ul>
         </div>
     </div>
+</div>
 
-    <div id="custom-alert-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="alert-message">
-            <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
-            <h3 id="alert-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
-            <button id="alert-ok-btn" class="btn-submit" style="margin-top: 0;">확인</button>
+<!-- 알림 / 확인 다이얼로그 -->
+<div id="custom-alert-modal" class="dialog-scrim modal-overlay hidden-view" style="z-index: 99999;">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="alert-message" data-tone="primary">
+        <span class="dialog__icon"><i data-icon="info"></i></span>
+        <div id="alert-message" class="dialog__body"></div>
+        <div class="dialog__actions"><button type="button" id="alert-ok-btn" class="btn btn-filled">확인</button></div>
+    </div>
+</div>
+
+<div id="custom-confirm-modal" class="dialog-scrim modal-overlay hidden-view" style="z-index: 99999;">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message" data-tone="danger" id="confirmDialog">
+        <span class="dialog__icon" id="confirmIcon"><i data-icon="danger"></i></span>
+        <div id="confirm-message" class="dialog__body"></div>
+        <div class="dialog__actions">
+            <button type="button" id="confirm-no-btn" class="btn btn-text">취소</button>
+            <button type="button" id="confirm-yes-btn" class="btn btn-filled btn--danger">확인</button>
         </div>
     </div>
+</div>
 
-    <div id="custom-confirm-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message">
-            <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
-            <h3 id="confirm-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-                <button id="confirm-no-btn" class="btn-secondary" style="flex: 1; margin: 0; background: var(--main-bg); color: var(--text-muted); border: 1px solid var(--border);">취소</button>
-                <button id="confirm-yes-btn" class="btn-danger" style="flex: 1; margin: 0; font-size: 1.05rem; padding: 12px; border-radius: 8px;">확인</button>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="/src/app.js"></script>
+<script type="module" src="/src/app.js"></script>
 </body>
 </html>

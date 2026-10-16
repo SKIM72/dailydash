@@ -36,6 +36,14 @@ export class ApiError extends Error {
 
 const LOGIN_PAGE = 'login.html';
 
+// 서버 연결 상태가 바뀔 때 화면에 알린다. (집 서버가 꺼져 있으면 배너를 띄우기 위함)
+let serverReachable = true;
+function setServerReachable(reachable) {
+  if (serverReachable === reachable) return;
+  serverReachable = reachable;
+  window.dispatchEvent(new CustomEvent('dailydash:network', { detail: { reachable } }));
+}
+
 async function request(method, path, { body, redirectOnUnauthorized = true } = {}) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -51,8 +59,10 @@ async function request(method, path, { body, redirectOnUnauthorized = true } = {
       body: body !== undefined ? JSON.stringify(body) : undefined
     });
   } catch {
+    setServerReachable(false);
     throw new ApiError('서버에 연결할 수 없습니다. 서버가 켜져 있는지, 인터넷 연결을 확인해 주세요.', { code: 'NETWORK_ERROR' });
   }
+  setServerReachable(true);
   if (response.status === 401 && token) writeToken(null);
 
   const text = await response.text();

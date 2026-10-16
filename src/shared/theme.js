@@ -41,7 +41,8 @@ export function applyThemePreference(preference = getThemePreference()) {
   root.dataset.themePreference = normalized;
 
   const themeColor = document.querySelector('meta[name="theme-color"]');
-  if (themeColor) themeColor.setAttribute('content', resolvedTheme === 'dark' ? '#0f172a' : '#6366f1');
+  if (themeColor) themeColor.setAttribute('content', resolvedTheme === 'dark' ? '#101318' : '#f7f8fc');
+  document.dispatchEvent(new CustomEvent('dailydash:theme', { detail: { preference: normalized, theme: resolvedTheme } }));
 
   updateThemeButtons(normalized);
   return { preference: normalized, theme: resolvedTheme };
@@ -72,6 +73,11 @@ export function initTheme() {
     }
     systemListenerInstalled = true;
   }
+}
+
+// 로그인 화면의 테마 버튼: 지금 보이는 테마의 반대로 바꾼다.
+export function toggleTheme() {
+  return setThemePreference(resolveTheme() === 'dark' ? 'light' : 'dark');
 }
 
 export function installThemeControls() {

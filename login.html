@@ -2,187 +2,210 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DailyDash - 로그인</title>
 
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#f7f8fc">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="DailyDash">
     <link rel="apple-touch-icon" href="/icon.jpeg">
-
     <link rel="icon" href="/favicon.png" type="image/png">
     <script>
         (() => {
-            const key = 'dailydash-theme-preference';
-            const options = ['system', 'light', 'dark'];
-            let stored = 'system';
+            let preference = 'system';
+            let scale = 1;
             try {
-                stored = localStorage.getItem(key);
+                const stored = localStorage.getItem('dailydash-theme-preference');
+                if (['system', 'light', 'dark'].includes(stored)) preference = stored;
+                const storedScale = Number(localStorage.getItem('dailydash-text-scale'));
+                if (storedScale >= 0.9 && storedScale <= 1.3) scale = storedScale;
             } catch {
-                stored = 'system';
+                preference = 'system';
             }
-            const preference = options.includes(stored) ? stored : 'system';
             const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
-            document.documentElement.dataset.theme = theme;
-            document.documentElement.dataset.themePreference = preference;
+            const root = document.documentElement;
+            root.dataset.theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+            root.dataset.themePreference = preference;
+            root.style.setProperty('--text-scale', String(scale));
         })();
     </script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="login-body-wrapper">
+<body class="auth-body">
+<div class="auth-layout">
+    <!-- 소개 영역 (데스크톱) -->
+    <section class="auth-hero" aria-hidden="true">
+        <div class="auth-hero__brand">
+            <span class="brand-mark"><img src="/icon.jpeg" alt=""></span>
+            DailyDash
+        </div>
+        <div>
+            <h1>오늘의 매출을<br>한눈에, 정확하게</h1>
+            <p>가게 정산부터 월간 요약, 통계 분석까지. 매일의 장사를 숫자로 차곡차곡 쌓아 보세요.</p>
+        </div>
+        <div class="auth-features">
+            <div class="auth-feature"><i data-icon="daily"></i>일일 매출 입력</div>
+            <div class="auth-feature"><i data-icon="monthly"></i>월간 요약</div>
+            <div class="auth-feature"><i data-icon="stats"></i>통계 분석</div>
+            <div class="auth-feature"><i data-icon="shield"></i>매일 자동 백업</div>
+        </div>
+    </section>
 
-    <div class="login-card">
-        <img src="/icon.jpeg" alt="DailyDash 로고" class="login-logo">
-        <div class="login-version" data-app-version>v0.7.0</div>
+    <!-- 로그인 영역 -->
+    <main class="auth-panel">
+        <button type="button" class="icon-btn icon-btn--outlined auth-theme-toggle" id="themeToggleBtn" aria-label="화면 모드 바꾸기" title="화면 모드 바꾸기"><i data-icon="moon"></i></button>
 
-        <div id="login-view">
-            <h2>DailyDash 로그인</h2>
-            <p class="login-subtitle">가게 정산 시스템 접속을 위해 인증해 주세요.</p>
+        <div class="auth-card">
+            <div class="auth-card__logo">
+                <span class="brand-mark"><img src="/icon.jpeg" alt="DailyDash 로고"></span>
+                <div><strong class="t-title-m">DailyDash</strong><br><span class="login-version" data-app-version>v0.8.0</span></div>
+            </div>
 
-            <form id="loginForm">
-                <div class="form-group" style="text-align: left;">
-                    <label for="loginEmail"><i class="far fa-envelope"></i> 이메일 주소</label>
-                    <input type="email" id="loginEmail" placeholder="example@email.com" autocomplete="username" required>
-                </div>
-
-                <div class="form-group" style="text-align: left; margin-bottom: 12px;">
-                    <label for="loginPassword"><i class="fas fa-lock"></i> 비밀번호</label>
-                    <div class="password-input-wrap">
-                        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
-                        <button type="button" class="toggle-password" data-toggle-password="loginPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
+            <!-- 로그인 -->
+            <div id="login-view">
+                <h2>로그인</h2>
+                <p class="login-subtitle">가게 정산 시스템 접속을 위해 인증해 주세요.</p>
+                <form id="loginForm" class="auth-form" novalidate>
+                    <div class="field-group">
+                        <div class="field field--lead">
+                            <i data-icon="mail" class="field__lead"></i>
+                            <input type="email" id="loginEmail" placeholder="example@email.com" autocomplete="username" required>
+                            <label for="loginEmail">이메일 주소</label>
+                        </div>
                     </div>
-                </div>
+                    <div class="field-group">
+                        <div class="field field--lead" id="loginPasswordField">
+                            <i data-icon="lock" class="field__lead"></i>
+                            <input type="password" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" required>
+                            <label for="loginPassword">비밀번호</label>
+                            <button type="button" class="icon-btn toggle-password" data-toggle-password="loginPassword" aria-label="비밀번호 보기"><i data-icon="eye"></i></button>
+                        </div>
+                        <span class="field-support" id="loginError" role="alert"></span>
+                    </div>
+                    <div class="auth-options">
+                        <label class="checkbox"><input type="checkbox" id="rememberEmail">아이디 저장</label>
+                        <button type="button" class="btn btn-text" data-view="reset">비밀번호 찾기</button>
+                    </div>
+                    <button type="submit" class="btn btn-filled btn--lg btn--block" id="loginBtn"><i data-icon="login"></i>로그인</button>
+                </form>
+                <div class="auth-divider">처음이신가요?</div>
+                <button type="button" class="btn btn-outlined btn--lg btn--block" data-view="signup"><i data-icon="user-add"></i>회원가입 신청</button>
+            </div>
 
-                <div class="auth-options">
-                    <label class="remember-me">
-                        <input type="checkbox" id="rememberEmail"> 아이디 저장
-                    </label>
-                    <button type="button" class="text-link" data-view="reset">비밀번호 찾기</button>
-                </div>
+            <!-- 회원가입 -->
+            <div id="signup-view" class="hidden-view">
+                <button type="button" class="btn btn-text auth-back" data-view="login"><i data-icon="arrow-back"></i>로그인으로</button>
+                <h2>회원가입 신청</h2>
+                <p class="login-subtitle">가입 후 관리자가 승인하면 사용할 수 있어요.</p>
+                <form id="signupForm" class="auth-form" novalidate>
+                    <div class="field-group">
+                        <div class="field field--lead">
+                            <i data-icon="mail" class="field__lead"></i>
+                            <input type="email" id="signupEmail" placeholder="example@email.com" autocomplete="username" required>
+                            <label for="signupEmail">사용할 이메일</label>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <div class="field field--lead">
+                            <i data-icon="lock" class="field__lead"></i>
+                            <input type="password" id="signupPassword" placeholder="8자 이상" autocomplete="new-password" required minlength="8">
+                            <label for="signupPassword">비밀번호 (8자 이상)</label>
+                            <button type="button" class="icon-btn toggle-password" data-toggle-password="signupPassword" aria-label="비밀번호 보기"><i data-icon="eye"></i></button>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <div class="field field--lead" id="signupConfirmField">
+                            <i data-icon="check" class="field__lead"></i>
+                            <input type="password" id="signupConfirmPassword" placeholder="한 번 더 입력" autocomplete="new-password" required minlength="8">
+                            <label for="signupConfirmPassword">비밀번호 확인</label>
+                            <button type="button" class="icon-btn toggle-password" data-toggle-password="signupConfirmPassword" aria-label="비밀번호 보기"><i data-icon="eye"></i></button>
+                        </div>
+                        <span class="field-support" id="signupError" role="alert"></span>
+                    </div>
+                    <button type="submit" class="btn btn-filled btn--lg btn--block" id="signupBtn"><i data-icon="user-add"></i>가입 신청하기</button>
+                </form>
+            </div>
 
-                <button type="submit" class="btn-submit" id="loginBtn" style="margin-bottom: 20px;">
-                    <i class="fas fa-sign-in-alt"></i> 로그인하기
-                </button>
-            </form>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">
-                아직 계정이 없으신가요? <button type="button" class="text-link" data-view="signup">회원가입</button>
+            <!-- 비밀번호 찾기 -->
+            <div id="reset-view" class="hidden-view">
+                <button type="button" class="btn btn-text auth-back" data-view="login"><i data-icon="arrow-back"></i>로그인으로</button>
+                <h2>비밀번호 찾기</h2>
+                <p class="login-subtitle" id="resetSubtitle">가입하신 이메일로 비밀번호 재설정 링크를 보내드립니다.</p>
+
+                <section id="resetDisabledNotice" class="banner auth-notice hidden-view">
+                    <span class="banner__icon"><i data-icon="admin"></i></span>
+                    <div class="banner__content">
+                        <div class="banner__head"><strong>관리자에게 요청해 주세요</strong></div>
+                        <p class="banner__text">이 서버는 메일 발송이 꺼져 있어요. 관리자에게 <strong>비밀번호 초기화</strong>를 요청하면 임시 비밀번호를 받을 수 있습니다.</p>
+                    </div>
+                </section>
+
+                <form id="resetForm" class="auth-form" novalidate>
+                    <div class="field-group">
+                        <div class="field field--lead">
+                            <i data-icon="mail" class="field__lead"></i>
+                            <input type="email" id="resetEmail" placeholder="example@email.com" autocomplete="username" required>
+                            <label for="resetEmail">가입한 이메일 주소</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-filled btn--lg btn--block" id="resetBtn"><i data-icon="send"></i>재설정 링크 보내기</button>
+                </form>
+            </div>
+
+            <!-- 새 비밀번호 -->
+            <div id="update-password-view" class="hidden-view">
+                <h2>새 비밀번호 설정</h2>
+                <p class="login-subtitle">새롭게 사용할 비밀번호를 입력해 주세요.</p>
+                <form id="updatePasswordForm" class="auth-form" novalidate>
+                    <div class="field-group">
+                        <div class="field field--lead">
+                            <i data-icon="lock" class="field__lead"></i>
+                            <input type="password" id="newPassword" placeholder="8자 이상" autocomplete="new-password" required minlength="8">
+                            <label for="newPassword">새 비밀번호 (8자 이상)</label>
+                            <button type="button" class="icon-btn toggle-password" data-toggle-password="newPassword" aria-label="비밀번호 보기"><i data-icon="eye"></i></button>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <div class="field field--lead" id="newPasswordConfirmField">
+                            <i data-icon="check" class="field__lead"></i>
+                            <input type="password" id="newPasswordConfirm" placeholder="한 번 더 입력" autocomplete="new-password" required minlength="8">
+                            <label for="newPasswordConfirm">새 비밀번호 확인</label>
+                            <button type="button" class="icon-btn toggle-password" data-toggle-password="newPasswordConfirm" aria-label="비밀번호 보기"><i data-icon="eye"></i></button>
+                        </div>
+                        <span class="field-support" id="updatePasswordError" role="alert"></span>
+                    </div>
+                    <button type="submit" class="btn btn-filled btn--lg btn--block" id="updatePwdBtn"><i data-icon="save"></i>비밀번호 변경하기</button>
+                </form>
+                <button type="button" class="btn btn-text auth-back" data-view="login" style="margin-top: 1rem;"><i data-icon="arrow-back"></i>로그인으로</button>
             </div>
         </div>
+    </main>
+</div>
 
-        <div id="signup-view" class="hidden-view">
-            <h2>관리자 회원가입</h2>
-            <p class="login-subtitle">새로운 DailyDash 계정을 생성합니다.</p>
+<div id="custom-alert-modal" class="dialog-scrim modal-overlay hidden-view" style="z-index: 99999;">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="alert-message" data-tone="primary">
+        <span class="dialog__icon"><i data-icon="info"></i></span>
+        <div id="alert-message" class="dialog__body"></div>
+        <div class="dialog__actions"><button type="button" id="alert-ok-btn" class="btn btn-filled">확인</button></div>
+    </div>
+</div>
 
-            <form id="signupForm">
-                <div class="form-group" style="text-align: left;">
-                    <label for="signupEmail"><i class="far fa-envelope"></i> 사용할 이메일</label>
-                    <input type="email" id="signupEmail" placeholder="example@email.com" autocomplete="username" required>
-                </div>
-
-                <div class="form-group" style="text-align: left;">
-                    <label for="signupPassword"><i class="fas fa-lock"></i> 비밀번호 (8자 이상)</label>
-                    <div class="password-input-wrap">
-                        <input type="password" id="signupPassword" placeholder="••••••••" autocomplete="new-password" required minlength="8">
-                        <button type="button" class="toggle-password" data-toggle-password="signupPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
-                    </div>
-                </div>
-
-                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
-                    <label for="signupConfirmPassword"><i class="fas fa-check-circle"></i> 비밀번호 확인</label>
-                    <div class="password-input-wrap">
-                        <input type="password" id="signupConfirmPassword" placeholder="••••••••" autocomplete="new-password" required minlength="8">
-                        <button type="button" class="toggle-password" data-toggle-password="signupConfirmPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-submit" id="signupBtn" style="margin-bottom: 20px;">
-                    <i class="fas fa-user-plus"></i> 가입하기
-                </button>
-            </form>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">
-                이미 계정이 있으신가요? <button type="button" class="text-link" data-view="login">로그인으로 돌아가기</button>
-            </div>
-        </div>
-
-        <div id="reset-view" class="hidden-view">
-            <h2>비밀번호 찾기</h2>
-            <p class="login-subtitle" id="resetSubtitle">가입하신 이메일로 비밀번호 재설정 링크를 보내드립니다.</p>
-
-            <div id="resetDisabledNotice" class="auth-notice hidden-view">
-                <i class="fas fa-user-shield"></i>
-                <p>이 서버는 메일 발송이 꺼져 있습니다.<br>관리자에게 <strong>비밀번호 초기화</strong>를 요청하면 임시 비밀번호를 받을 수 있습니다.</p>
-            </div>
-
-            <form id="resetForm">
-                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
-                    <label for="resetEmail"><i class="far fa-envelope"></i> 가입한 이메일 주소</label>
-                    <input type="email" id="resetEmail" placeholder="example@email.com" autocomplete="username" required>
-                </div>
-
-                <button type="submit" class="btn-submit" id="resetBtn" style="margin-bottom: 20px;">
-                    <i class="fas fa-paper-plane"></i> 재설정 링크 발송
-                </button>
-            </form>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">
-                <button type="button" class="text-link" data-view="login"><i class="fas fa-arrow-left"></i> 로그인으로 돌아가기</button>
-            </div>
-        </div>
-
-        <div id="update-password-view" class="hidden-view">
-            <h2>새 비밀번호 설정</h2>
-            <p class="login-subtitle">새롭게 사용할 비밀번호를 입력해 주세요.</p>
-
-            <form id="updatePasswordForm">
-                <div class="form-group" style="text-align: left;">
-                    <label for="newPassword"><i class="fas fa-lock"></i> 새 비밀번호 (8자 이상)</label>
-                    <div class="password-input-wrap">
-                        <input type="password" id="newPassword" placeholder="••••••••" autocomplete="new-password" required minlength="8">
-                        <button type="button" class="toggle-password" data-toggle-password="newPassword" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
-                    </div>
-                </div>
-
-                <div class="form-group" style="text-align: left; margin-bottom: 24px;">
-                    <label for="newPasswordConfirm"><i class="fas fa-check-circle"></i> 새 비밀번호 확인</label>
-                    <div class="password-input-wrap">
-                        <input type="password" id="newPasswordConfirm" placeholder="••••••••" autocomplete="new-password" required minlength="8">
-                        <button type="button" class="toggle-password" data-toggle-password="newPasswordConfirm" aria-label="비밀번호 보기"><i class="fas fa-eye"></i></button>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-submit" id="updatePwdBtn" style="background: var(--secondary); margin-bottom: 20px;">
-                    <i class="fas fa-save"></i> 비밀번호 변경하기
-                </button>
-            </form>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">
-                <button type="button" class="text-link" data-view="login"><i class="fas fa-arrow-left"></i> 로그인으로 돌아가기</button>
-            </div>
+<div id="custom-confirm-modal" class="dialog-scrim modal-overlay hidden-view" style="z-index: 99999;">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message" data-tone="danger" id="confirmDialog">
+        <span class="dialog__icon" id="confirmIcon"><i data-icon="danger"></i></span>
+        <div id="confirm-message" class="dialog__body"></div>
+        <div class="dialog__actions">
+            <button type="button" id="confirm-no-btn" class="btn btn-text">취소</button>
+            <button type="button" id="confirm-yes-btn" class="btn btn-filled btn--danger">확인</button>
         </div>
     </div>
+</div>
 
-    <div id="custom-alert-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="alert-message">
-            <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
-            <h3 id="alert-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
-            <button id="alert-ok-btn" class="btn-submit" style="margin-top: 0;">확인</button>
-        </div>
-    </div>
-
-    <div id="custom-confirm-modal" class="modal-overlay hidden-view" style="z-index: 99999;">
-        <div class="custom-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message">
-            <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
-            <h3 id="confirm-message" style="margin-bottom: 1.5rem; font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-main); word-break: keep-all;"></h3>
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-                <button id="confirm-no-btn" class="btn-secondary" style="flex: 1; margin: 0; background: var(--main-bg); color: var(--text-muted); border: 1px solid var(--border);">취소</button>
-                <button id="confirm-yes-btn" class="btn-danger" style="flex: 1; margin: 0; font-size: 1.05rem; padding: 12px; border-radius: 8px;">확인</button>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="/src/auth.js"></script>
+<script type="module" src="/src/auth.js"></script>
 </body>
 </html>

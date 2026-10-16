@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v30-selfhost';
+const CACHE_NAME = 'dailydash-v31-m3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
