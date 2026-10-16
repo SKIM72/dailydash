@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v33-apk';
+const CACHE_NAME = 'dailydash-v34-layout';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
