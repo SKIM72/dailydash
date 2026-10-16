@@ -889,6 +889,12 @@ html[data-theme="dark"] .compare-row--reference { background: transparent; }
 .compare-delta.is-negative { background: var(--md-error-container); color: var(--md-on-error-container); }
 .compare-row__note { font-size: 0.75rem; color: var(--md-on-surface-variant); }
 
+/* 마감 입력 알림 (설정 탭) */
+.reminder-controls { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding-left: 3.25rem; }
+.reminder-controls[hidden] { display: none; }
+.reminder-time { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 600; }
+.reminder-time select { height: 2.25rem; padding: 0 0.625rem; border-radius: var(--shape-sm); border: 1px solid var(--md-outline-variant); background: var(--md-surface); color: var(--md-on-surface); font: inherit; }
+
 /* 오프라인 입력 보관함 (배너) */
 .outbox-list { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; }
 .outbox-list:empty { display: none; }

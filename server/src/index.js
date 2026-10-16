@@ -1,13 +1,16 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import express from 'express';
-import { cleanupExpiredTokens, isAllowedCrossOrigin, loadSession } from './auth.js';
+import { cleanupExpiredTokens, isAllowedCrossOrigin, loadSession, requireAdmin } from './auth.js';
 import { config, isAiEnabled, isMailEnabled } from './config.js';
 import { pool, runMigrations, waitForDatabase } from './db.js';
 import { HttpError } from './http.js';
 import adminRoutes from './routes/admin.js';
 import aiRoutes from './routes/ai.js';
 import descriptionRoutes from './routes/descriptions.js';
+import pushRoutes from './routes/push.js';
+import { initPush } from './push.js';
+import { runMonthlyReportCheck, runReminderCheck, startSchedulers } from './schedulers.js';
 import authRoutes from './routes/auth.js';
 import reportRoutes from './routes/reports.js';
 import transactionRoutes from './routes/transactions.js';
@@ -81,6 +84,18 @@ api.use('/transactions', transactionRoutes);
 api.use('/admin', adminRoutes);
 api.use('/ai', aiRoutes);
 api.use('/descriptions', descriptionRoutes);
+api.use('/push', pushRoutes);
+
+// 자동 시험 전용: 정해진 시각을 기다리지 않고 주기 작업을 바로 돌린다. (ENABLE_TEST_HOOKS=1 일 때만)
+if (process.env.ENABLE_TEST_HOOKS === '1') {
+  api.post('/test-hooks/run', requireAdmin, async (req, res) => {
+    const now = req.body?.now ? new Date(req.body.now) : new Date();
+    const jobs = { reminders: runReminderCheck, 'monthly-report': runMonthlyReportCheck };
+    const job = jobs[req.body?.job];
+    if (!job || Number.isNaN(now.getTime())) throw new HttpError(400, 'BAD_REQUEST', 'job/now 를 확인해 주세요.');
+    res.json(await job(now));
+  });
+}
 api.use('/', reportRoutes);
 
 api.use((req, res) => {
@@ -141,6 +156,9 @@ async function start() {
   await runMigrations();
   await cleanupExpiredTokens();
   setInterval(() => cleanupExpiredTokens().catch((err) => console.error('[cleanup]', err)), 3_600_000).unref();
+  await initPush();
+  // 시험 환경(DISABLE_SCHEDULERS=1)에서는 정해진 시각에 저절로 도는 작업을 끈다.
+  if (process.env.DISABLE_SCHEDULERS !== '1') startSchedulers();
 
   const server = app.listen(config.port, config.host, () => {
     console.log(`[web] DailyDash 서버 실행 중: http://${config.host}:${config.port}`);

@@ -11,7 +11,7 @@
   "navigationDividerColor": "#F7F8FC",
   "navigationDividerColorDark": "#101318",
   "backgroundColor": "#F7F8FC",
-  "enableNotifications": false,
+  "enableNotifications": true,
   "startUrl": "/index.html?source=twa",
   "iconUrl": "https://dailydash.duckdns.org/icons/icon-512.png",
   "maskableIconUrl": "https://dailydash.duckdns.org/icons/icon-maskable-512.png",
@@ -20,8 +20,8 @@
     "path": "C:\\Users\\aa\\DailyDash-Android-Key\\dailydash-release.jks",
     "alias": "dailydash"
   },
-  "appVersionName": "1.0.0",
-  "appVersionCode": 1,
+  "appVersionName": "1.1.0",
+  "appVersionCode": 2,
   "shortcuts": [
     {
       "name": "내역 입력",
@@ -65,5 +65,5 @@
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "displayOverride": [],
-  "appVersion": "1.0.0"
+  "appVersion": "1.1.0"
 }

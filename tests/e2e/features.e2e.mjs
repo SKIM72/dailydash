@@ -1,5 +1,9 @@
 // 새 기능 E2E: 적요 묶기 · 자동완성 · 월말 예상 · 품목 시즌 · 오프라인 입력 · 알림 설정
-import { BASE, SHOTS, closeDb, createReporter, kstToday, launchBrowser, login, sql } from './config.mjs';
+import { createECDH, randomBytes } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { BASE, MOCK_GEMINI, SHOTS, closeDb, createReporter, kstToday, launchBrowser, login, sql } from './config.mjs';
+
+const serverRequire = createRequire(new URL('../../server/package.json', import.meta.url));
 
 const reporter = createReporter('새 기능');
 const { check, watch } = reporter;
@@ -218,12 +222,105 @@ async function testOfflineOutbox(browser) {
   await ctx.close();
 }
 
+// 가짜 브라우저 구독 (P-256 키) - 서버가 보낸 암호화 알림을 풀어 내용까지 확인한다.
+function createFakeSubscription(endpoint) {
+  const ecdh = createECDH('prime256v1');
+  ecdh.generateKeys();
+  const authSecret = randomBytes(16);
+  return {
+    ecdh,
+    authSecret,
+    json: { endpoint, keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: authSecret.toString('base64url') } }
+  };
+}
+
+function decryptPush(push, subscription) {
+  const ece = serverRequire('http_ece');
+  const plain = ece.decrypt(Buffer.from(push.body, 'base64'), { version: 'aes128gcm', privateKey: subscription.ecdh, authSecret: subscription.authSecret });
+  return JSON.parse(plain.toString('utf8'));
+}
+
+async function testReminders(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ko-KR' });
+  const page = await login(ctx);
+  watch(page, 'reminders');
+  const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method, body }) => {
+    const res = await fetch(`api${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+    return { status: res.status, data: await res.json().catch(() => null) };
+  }, { path, method, body });
+  const pushes = async () => (await fetch(`${MOCK_GEMINI}/__pushes`)).json();
+
+  const key = await api('/push/public-key');
+  check('알림: 서버 공개키(VAPID) 준비', key.data.enabled && key.data.publicKey.length > 60);
+
+  const device = createFakeSubscription(`${MOCK_GEMINI}/push/device1`);
+  const gone = createFakeSubscription(`${MOCK_GEMINI}/push/gone`);
+  const subscribe = await api('/push/subscribe', 'POST', { subscription: device.json, reminderTime: '21:30' });
+  await api('/push/subscribe', 'POST', { subscription: gone.json, reminderTime: '21:00' });
+  const status = await api('/push/status', 'POST', { endpoint: device.json.endpoint });
+  check('알림: 기기 구독 + 시각 저장', subscribe.status === 201 && status.data.subscribed && status.data.reminderTime === '21:30');
+  check('알림: 잘못된 시각 거부', (await api('/push/subscribe', 'POST', { subscription: device.json, reminderTime: '25:00' })).status === 400);
+
+  // 입력이 하나도 없는 날(내일) 22:00 → 알림, 만료된 구독(410)은 지운다
+  const tomorrow = kstToday(1);
+  const before = (await pushes()).length;
+  const run1 = await api('/test-hooks/run', 'POST', { job: 'reminders', now: `${tomorrow}T22:00:00+09:00` });
+  const received = (await pushes()).slice(before);
+  const devicePush = received.find((push) => push.id === 'device1');
+  check('알림: 입력 없는 날 마감 시각이 지나면 보냄', run1.data.sent === 1 && Boolean(devicePush), JSON.stringify(run1.data));
+  check('알림: VAPID 서명·암호화 헤더', Boolean(devicePush?.headers.authorization?.startsWith('vapid ')) && devicePush?.headers['content-encoding'] === 'aes128gcm');
+  const message = devicePush ? decryptPush(devicePush, device) : {};
+  check('알림: 내용(암호 풀기) = 마감 입력 안내 + 입력 화면 주소', message.title === 'DailyDash 마감 입력' && message.url === 'index.html?view=daily&action=new', message.body);
+  const [{ count: goneLeft }] = await sql('SELECT COUNT(*)::int AS count FROM push_subscriptions WHERE endpoint = $1', [gone.json.endpoint]);
+  check('알림: 만료된 구독(410)은 자동 삭제', goneLeft === 0);
+
+  const run2 = await api('/test-hooks/run', 'POST', { job: 'reminders', now: `${tomorrow}T23:00:00+09:00` });
+  check('알림: 같은 날 두 번 보내지 않음', run2.data.sent === 0);
+
+  // 입력이 있는 날(오늘)은 보내지 않는다
+  await sql('UPDATE push_subscriptions SET last_sent_on = NULL');
+  const run3 = await api('/test-hooks/run', 'POST', { job: 'reminders', now: `${kstToday()}T23:00:00+09:00` });
+  check('알림: 오늘 입력이 있으면 보내지 않음', run3.data.sent === 0 && run3.data.entries > 0, JSON.stringify(run3.data));
+  const run4 = await api('/test-hooks/run', 'POST', { job: 'reminders', now: `${kstToday(2)}T20:00:00+09:00` });
+  check('알림: 알림 시각 전에는 보내지 않음', run4.data.sent === 0);
+
+  const testPush = await api('/push/test', 'POST', { endpoint: device.json.endpoint });
+  check('알림: 시험 알림 보내기', testPush.data.ok === true);
+  check('알림: 직원·다른 계정은 남의 기기로 시험 알림 불가', (await api('/push/test', 'POST', { endpoint: 'https://example.invalid/x' })).status === 400);
+  await api('/push/subscribe', 'DELETE', { endpoint: device.json.endpoint });
+  check('알림: 끄면 구독 삭제', !(await api('/push/status', 'POST', { endpoint: device.json.endpoint })).data.subscribed);
+
+  // 설정 탭: 이 시험 환경(127.0.0.1)은 서비스워커를 쓰지 않으므로 끈 상태 + 안내
+  await page.click('#myPageBtn');
+  await page.click('[data-tab="settings"]');
+  await page.locator('#reminderSetting').waitFor();
+  await page.waitForFunction(() => document.getElementById('reminderHint').textContent.length > 0);
+  check('설정 탭: 마감 입력 알림 항목 표시', (await page.innerText('#reminderSetting')).includes('마감 입력 알림'));
+  await page.keyboard.press('Escape');
+
+  // 매월 AI 리포트 자동 생성: 다음 달 1일 오전 7시 → 이번 달(마감 기준) 리포트
+  const thisMonth = kstToday().slice(0, 7);
+  const [year, month] = thisMonth.split('-').map(Number);
+  const nextMonthFirst = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const notDue = await api('/test-hooks/run', 'POST', { job: 'monthly-report', now: `${nextMonthFirst.slice(0, 8)}10T07:00:00+09:00` });
+  check('AI 자동 생성: 6일 이후에는 하지 않음', notDue.data.skipped === 'not-due');
+  const auto = await api('/test-hooks/run', 'POST', { job: 'monthly-report', now: `${nextMonthFirst}T07:00:00+09:00` });
+  const [saved] = await sql("SELECT report_month, data_through::text AS data_through, created_by FROM ai_reports WHERE report_month = $1 ORDER BY id DESC LIMIT 1", [thisMonth]);
+  check('AI 자동 생성: 다음 달 1일에 지난달(마감) 리포트를 만듦', auto.data.created === true && saved?.created_by === null && saved?.data_through.slice(0, 7) === thisMonth && saved.data_through.slice(8) >= '28', JSON.stringify({ auto: auto.data, saved }));
+  const again = await api('/test-hooks/run', 'POST', { job: 'monthly-report', now: `${nextMonthFirst}T08:00:00+09:00` });
+  check('AI 자동 생성: 이미 있으면 다시 만들지 않음', again.data.skipped === 'exists');
+  const [{ count: autoAudit }] = await sql("SELECT COUNT(*)::int AS count FROM audit_logs WHERE action = 'AI 리포트 생성' AND user_email = 'system (자동)'");
+  check('AI 자동 생성: 작업 이력에 "system (자동)" 기록', autoAudit === 1);
+  await ctx.close();
+}
+
 const browser = await launchBrowser();
 try {
   await testDescriptionAliases(browser);
   await testMemberCannotEditAliases(browser);
   await testForecastAndSeasons(browser);
   await testOfflineOutbox(browser);
+  await testReminders(browser);
 } catch (err) {
   reporter.fail(err);
 } finally {

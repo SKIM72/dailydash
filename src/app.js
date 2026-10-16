@@ -20,6 +20,7 @@ import { installConfirmSwitch, installTextScaleSlider, isConfirmBeforeSave } fro
 import { installThemeControls } from './shared/theme.js';
 import { hideInstallEntriesWhenStandalone, registerServiceWorker } from './shared/pwa.js';
 import { OUTBOX_EVENT, addToOutbox, flushOutbox, newClientId, readOutbox, removeFromOutbox } from './shared/outbox.js';
+import { DEFAULT_REMINDER_TIME, disableReminder, enableReminder, getReminderState, isPushSupported, sendTestReminder, updateReminderTime } from './shared/reminders.js';
 import {
     createSheet,
     installDrawer,
@@ -134,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tab === 'history') loadOperationHistory();
             if (tab === 'users' && isSuperAdmin()) loadUserManagement();
             if (tab === 'items' && isSuperAdmin()) loadItemManagement();
+            if (tab === 'settings') loadReminderSetting();
         }
     });
     installTextScaleSlider(document.getElementById('textScaleSlider'), document.getElementById('textScaleValue'));
@@ -1261,6 +1263,80 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', onClick);
         return button;
     }
+
+    /* ---------------- 마감 입력 알림 (설정 탭) ---------------- */
+    const reminderSwitch = document.getElementById('reminderSwitch');
+    const reminderControls = document.getElementById('reminderControls');
+    const reminderTimeSelect = document.getElementById('reminderTime');
+    const reminderHint = document.getElementById('reminderHint');
+    let reminderPublicKey = null;
+    const REMINDER_HINT = '정한 시각까지 오늘 입력이 없으면 이 기기로 알려 드려요.';
+
+    function showReminderState({ supported, reason, subscribed = false, reminderTime }) {
+        reminderSwitch.disabled = !supported;
+        reminderSwitch.checked = Boolean(supported && subscribed);
+        reminderControls.hidden = !reminderSwitch.checked;
+        if (reminderTime) reminderTimeSelect.value = reminderTime;
+        if (supported) {
+            reminderHint.textContent = REMINDER_HINT;
+        } else if (reason === 'browser' && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
+            reminderHint.textContent = '아이폰은 Safari 에서 "홈 화면에 추가"한 앱으로 열어야 알림을 받을 수 있어요.';
+        } else if (reason === 'server') {
+            reminderHint.textContent = '서버에서 알림 기능이 꺼져 있어요.';
+        } else {
+            reminderHint.textContent = '이 브라우저에서는 알림을 쓸 수 없어요. 설치한 앱이나 Chrome 에서 켜 주세요.';
+        }
+    }
+
+    async function loadReminderSetting() {
+        if (!reminderSwitch) return;
+        try {
+            const state = await getReminderState();
+            reminderPublicKey = state.publicKey || null;
+            showReminderState(state);
+        } catch (err) {
+            showReminderState({ supported: false, reason: 'error' });
+            console.warn('알림 상태를 확인하지 못했습니다.', err);
+        }
+    }
+
+    reminderSwitch?.addEventListener('change', async () => {
+        const turnOn = reminderSwitch.checked;
+        reminderSwitch.disabled = true;
+        try {
+            if (turnOn) {
+                await enableReminder(reminderPublicKey, reminderTimeSelect.value || DEFAULT_REMINDER_TIME);
+                showToast(`마감 입력 알림을 켰어요. 매일 ${reminderTimeSelect.value}까지 입력이 없으면 알려 드려요.`);
+            } else {
+                await disableReminder();
+                showToast('이 기기의 마감 입력 알림을 껐어요.', { tone: 'info' });
+            }
+        } catch (err) {
+            showToast(err.message, { tone: 'danger', duration: 6000 });
+        } finally {
+            await loadReminderSetting();
+        }
+    });
+
+    reminderTimeSelect?.addEventListener('change', async () => {
+        try {
+            await updateReminderTime(reminderTimeSelect.value);
+            showToast(`알림 시각을 ${reminderTimeSelect.value}(으)로 바꿨어요.`);
+        } catch (err) {
+            showToast(err.message, { tone: 'danger' });
+        }
+    });
+
+    document.getElementById('reminderTestBtn')?.addEventListener('click', async () => {
+        try {
+            const result = await sendTestReminder();
+            showToast(result.ok ? '시험 알림을 보냈어요. 잠시 뒤 알림이 오는지 확인해 주세요.' : '알림을 보내지 못했어요. 알림을 껐다가 다시 켜 주세요.', { tone: result.ok ? 'success' : 'danger' });
+        } catch (err) {
+            showToast(err.message, { tone: 'danger' });
+        }
+    });
+
+    if (!isPushSupported()) showReminderState({ supported: false, reason: 'browser' });
 
     /* ---------------- 오프라인 입력 보관함 ---------------- */
     const LAST_USER_KEY = 'dailydash-last-user';

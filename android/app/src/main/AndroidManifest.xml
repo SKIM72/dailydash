@@ -17,6 +17,9 @@
 <!-- 패키지 이름은 app/build.gradle 의 namespace · applicationId 로 정한다. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 마감 입력 알림 (웹 푸시 알림 위임) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     
 
     
@@ -167,7 +170,9 @@
             android:enabled="@bool/enableNotification"
             android:exported="@bool/enableNotification">
 
-            
+            <meta-data
+                android:name="android.support.customtabs.trusted.SMALL_ICON"
+                android:resource="@drawable/ic_notification_icon" />
 
             <intent-filter>
                 <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE"/>
@@ -175,8 +180,7 @@
             </intent-filter>
         </service>
 
-        
-
-        
+        <!-- Android 13 이상에서 웹의 알림 권한 요청을 앱 권한 요청으로 이어 준다 -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
     </application>
 </manifest>

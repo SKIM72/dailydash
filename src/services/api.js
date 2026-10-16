@@ -88,7 +88,7 @@ const get = (path, options) => request('GET', path, options);
 const post = (path, body, options) => request('POST', path, { ...options, body: body ?? {} });
 const put = (path, body) => request('PUT', path, { body });
 const patch = (path, body) => request('PATCH', path, { body });
-const del = (path) => request('DELETE', path);
+const del = (path, body) => request('DELETE', path, body === undefined ? {} : { body });
 
 let currentUserPromise = null;
 
@@ -150,6 +150,12 @@ export const api = {
   descriptionAliases: () => get('/descriptions/aliases'),
   listDescriptions: () => get('/descriptions'),
   saveDescriptionAliases: (aliases) => put('/descriptions/aliases', { aliases }),
+  // 마감 입력 알림 (웹 푸시)
+  pushPublicKey: () => get('/push/public-key'),
+  pushStatus: (endpoint) => post('/push/status', { endpoint }),
+  pushSubscribe: (subscription, reminderTime) => post('/push/subscribe', { subscription, reminderTime }),
+  pushUnsubscribe: (endpoint) => del('/push/subscribe', { endpoint }),
+  pushTest: (endpoint) => post('/push/test', { endpoint }),
   itemSeasons: (item) => get(`/descriptions/seasons${item ? `?${qs({ item })}` : ''}`),
 
   // AI 월간 리포트 (Gemini) - 만들기는 관리자만

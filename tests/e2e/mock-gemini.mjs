@@ -1,9 +1,11 @@
-// Gemini generateContent 를 흉내 내는 시험용 서버. 받은 요청을 기록하고 정해진 응답을 돌려준다.
-// POST /__mode {"mode":"ok"|"429"|"badjson"} 로 동작을 바꾸고, GET /__calls 로 받은 요청을 본다.
+// 시험용 가짜 서버: Gemini generateContent 와 웹 푸시 서비스를 흉내 낸다.
+// POST /__mode {"mode":"ok"|"429"|"badjson"} 로 Gemini 동작을 바꾸고, GET /__calls · /__pushes 로 받은 요청을 본다.
+// 푸시: POST /push/<id> 는 201, /push/gone 은 410(구독 만료)을 돌려준다.
 import http from 'node:http';
 
 let mode = 'ok';
 const calls = [];
+const pushes = [];
 const REPORT = {
   headline: '작년 같은 기간보다 매출이 늘었지만 영업일당으로는 비슷한 흐름입니다.',
   summary: ['오늘까지 매출은 151.7만원입니다.', '전년 같은 기간 대비 +53.9% 입니다.', '영업일당 매출은 11.7만원입니다.'],
@@ -13,8 +15,10 @@ const REPORT = {
 };
 
 const server = http.createServer(async (req, res) => {
-  let body = '';
-  for await (const chunk of req) body += chunk;
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks);
+  const body = raw.toString('utf8');
   if (req.url === '/__mode') {
     mode = JSON.parse(body).mode;
     return res.end('ok');
@@ -22,6 +26,15 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/__calls') {
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify(calls));
+  }
+  if (req.url === '/__pushes') {
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify(pushes));
+  }
+  if (req.url.startsWith('/push/') && req.method === 'POST') {
+    pushes.push({ id: req.url.slice('/push/'.length), headers: req.headers, body: raw.toString('base64') });
+    res.statusCode = req.url === '/push/gone' ? 410 : 201;
+    return res.end();
   }
   const match = /^\/v1beta\/models\/([^/:]+):generateContent$/.exec(req.url);
   if (req.method !== 'POST' || !match) {

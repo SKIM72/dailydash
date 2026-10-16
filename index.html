@@ -677,6 +677,19 @@
                         <div class="setting-row__text"><strong>저장 전 확인창</strong><small>내역을 저장하기 전에 한 번 더 확인해요. (이 기기)</small></div>
                         <label class="switch"><input type="checkbox" id="confirmBeforeSaveSwitch" role="switch" checked aria-label="저장 전 확인창"></label>
                     </div>
+                    <div class="setting-row setting-row--stack" id="reminderSetting">
+                        <div class="setting-row__head">
+                            <span class="setting-row__icon"><i data-icon="clock"></i></span>
+                            <div class="setting-row__text"><strong>마감 입력 알림</strong><small id="reminderHint">정한 시각까지 오늘 입력이 없으면 이 기기로 알려 드려요.</small></div>
+                            <label class="switch"><input type="checkbox" id="reminderSwitch" role="switch" aria-label="마감 입력 알림" disabled></label>
+                        </div>
+                        <div class="reminder-controls" id="reminderControls" hidden>
+                            <label class="reminder-time">알림 시각
+                                <select id="reminderTime"><option value="17:00">17:00</option><option value="17:30">17:30</option><option value="18:00">18:00</option><option value="18:30">18:30</option><option value="19:00">19:00</option><option value="19:30">19:30</option><option value="20:00">20:00</option><option value="20:30">20:30</option><option value="21:00" selected>21:00</option><option value="21:30">21:30</option><option value="22:00">22:00</option><option value="22:30">22:30</option><option value="23:00">23:00</option><option value="23:30">23:30</option></select>
+                            </label>
+                            <button type="button" class="btn btn-text" id="reminderTestBtn"><i data-icon="send"></i>시험 알림 보내기</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 

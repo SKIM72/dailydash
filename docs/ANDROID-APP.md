@@ -12,6 +12,7 @@ DailyDash 안드로이드 앱은 구글이 PWA 를 앱으로 만들 때 권하�
 | 패키지 이름 | `org.duckdns.dailydash.twa` (한 번 정하면 바꾸지 않습니다) |
 | 시작 주소 | `https://dailydash.duckdns.org/index.html?source=twa` |
 | 최소 버전 | Android 7.0 (API 24) |
+| 현재 버전 | 1.1.0 (versionCode 2) - 마감 입력 알림(알림 위임) 지원 |
 | 서명 키 | `C:\Users\aa\DailyDash-Android-Key\` (저장소 밖) |
 
 ## 관련 파일
