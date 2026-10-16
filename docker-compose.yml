@@ -109,6 +109,33 @@ services:
           sleep 86400
         done
 
+  # (선택) 외부 백업: 매일 최근 백업 파일을 암호화해 Google Drive 로 복사하고, 90일 지난 것은 지운다. (docs/BACKUP.md)
+  # 설정 파일(./offsite/rclone.conf)에 Drive 로그인 정보와 암호가 들어 있으므로 저장소에 올리지 않는다.
+  offsite:
+    image: rclone/rclone:1.75.1
+    profiles: ["offsite"]
+    restart: unless-stopped
+    mem_limit: 128m
+    environment:
+      TZ: Asia/Seoul
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups:ro
+      - ./offsite:/config/rclone
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 900  # 앱·백업이 먼저 자리 잡도록 잠시 대기
+        while true; do
+          if rclone copy /backups dailydash-offsite: --include 'dailydash-*.sql.gz' --max-age 7d --log-level NOTICE; then
+            echo "[offsite] $(date '+%F %T') 외부 백업 복사 완료"
+          else
+            echo "[offsite] $(date '+%F %T') 외부 백업 실패 - 내일 다시 시도" >&2
+          fi
+          rclone delete dailydash-offsite: --min-age 90d --log-level NOTICE || true
+          sleep 86400
+        done
+
   duckdns:
     image: curlimages/curl:8.11.1
     profiles: ["duckdns"]

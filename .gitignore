@@ -21,3 +21,6 @@ keystore.properties
 
 # E2E 스크린샷
 tests/e2e/shots/
+
+# 외부 백업 설정 (Google Drive 로그인 정보 · 암호)
+offsite/

@@ -267,6 +267,7 @@ npm run dev            # 화면 → http://127.0.0.1:5173  (/api 는 3000 번으
   안드로이드 앱(APK) 빌드·서명 키 관리는 [ANDROID-APP.md](ANDROID-APP.md) 에 정리되어 있습니다.
 - 월간 요약의 AI 월간 리포트(Google Gemini)를 켜는 방법은 [AI-REPORT.md](AI-REPORT.md) 를 참고하세요.
 - 마감 입력 알림(웹 푸시)은 [NOTIFICATIONS.md](NOTIFICATIONS.md) 를 참고하세요.
+- 백업 · 외부 백업(Google Drive) · 복구 연습은 [BACKUP.md](BACKUP.md) 를 참고하세요.
 - **배포할 때 `public/sw.js` 의 `CACHE_NAME` 버전을 올리세요.** 그래야 직원 휴대폰에 열려 있던 앱에 "새 버전이 준비됐어요 · 새로고침" 안내가 뜹니다.
 
 ## 11. 문제 해결
