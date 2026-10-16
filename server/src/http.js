@@ -22,7 +22,8 @@ export function parseDate(value, field = '날짜') {
   return text;
 }
 
-export function parseDateRange(startValue, endValue, maxDays = 1100) {
+// 운영 데이터가 2017년부터 쌓여 있어 '전체 기간' 조회가 가능하도록 넉넉히 둔다. (약 15년)
+export function parseDateRange(startValue, endValue, maxDays = 5500) {
   const start = parseDate(startValue, '시작일');
   const end = parseDate(endValue, '종료일');
   if (start > end) throw badRequest('시작일이 종료일보다 늦을 수 없습니다.');
