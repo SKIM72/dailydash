@@ -131,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         onChange: (tab) => {
             if (tab === 'history') loadOperationHistory();
             if (tab === 'users' && isSuperAdmin()) loadUserManagement();
+            if (tab === 'items' && isSuperAdmin()) loadItemManagement();
         }
     });
     installTextScaleSlider(document.getElementById('textScaleSlider'), document.getElementById('textScaleValue'));
@@ -350,8 +351,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return api.dailySummary(startStr, endStr);
     }
 
-    function fetchTransactionsForRange(startStr, endStr) {
-        return api.listTransactionsInRange(startStr, endStr);
+    // 관리자가 묶어 둔 적요 대표 이름 (분석 전용 - 원본 내역은 그대로)
+    let aliasMapPromise = null;
+    function getAliasMap() {
+        aliasMapPromise ||= api.descriptionAliases()
+            .then((data) => ({ map: new Map(Object.entries(data.aliases || {})), notAnItem: data.notAnItem }))
+            .catch(() => ({ map: new Map(), notAnItem: '(품목 아님)' }));
+        return aliasMapPromise;
+    }
+
+    // 분석용 건별 내역: 묶어 둔 적요는 대표 이름으로 바꾸고, '(품목 아님)' 은 품목 분석에서 뺀다.
+    async function fetchTransactionsForRange(startStr, endStr) {
+        const [transactions, { map, notAnItem }] = await Promise.all([api.listTransactionsInRange(startStr, endStr), getAliasMap()]);
+        return transactions
+            .map((tx) => {
+                const canonical = map.get(String(tx.description || '').trim());
+                return canonical ? { ...tx, description: canonical } : tx;
+            })
+            .filter((tx) => tx.description !== notAnItem);
+    }
+
+    // 적요 입력 자동완성 (최근 1년 동안 많이 쓴 대표 이름)
+    const descSuggestions = document.getElementById('descSuggestions');
+    async function loadDescriptionSuggestions() {
+        try {
+            const names = await api.descriptionSuggestions();
+            descSuggestions?.replaceChildren(...names.map((name) => new Option(name)));
+        } catch (err) {
+            console.warn('적요 자동완성 목록을 불러오지 못했습니다.', err);
+        }
+    }
+
+    function rememberDescriptionSuggestion(name) {
+        if (!descSuggestions || !name || [...descSuggestions.options].some((option) => option.value === name)) return;
+        descSuggestions.prepend(new Option(name));
     }
 
     // 기간 통계 화면에서 쓰는 4가지 데이터를 동시에 받아온다. (기존엔 순서대로 4번 기다렸음)
@@ -942,6 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUserEmail = currentUser.email || '';
         applySensitiveActionGuard();
         renderAccountInfo();
+        loadDescriptionSuggestions();
 
         // 운영 데이터 보호: 프론트엔드에서는 삭제 보관분을 물리 삭제하지 않는다.
         // 장기 보관/정리는 Supabase 백업 확인 후 서버 작업이나 스케줄러에서 별도로 처리한다.
@@ -1072,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         setText('operationHistoryTitle', isSuperAdmin() ? '전체 작업 이력' : '내 작업 이력');
         document.getElementById('usersTabBtn')?.classList.toggle('hidden-view', !isSuperAdmin());
+        document.getElementById('itemsTabBtn')?.classList.toggle('hidden-view', !isSuperAdmin());
         superUserPanel?.classList.toggle('hidden-view', !isSuperAdmin());
     }
 
@@ -1175,6 +1210,171 @@ document.addEventListener('DOMContentLoaded', () => {
         button.append(iconElement(iconName), label);
         button.addEventListener('click', onClick);
         return button;
+    }
+
+    /* ---------------- 적요 정리 (관리자) ---------------- */
+    const itemsPanel = document.getElementById('itemsPanel');
+
+    function createItemSection(title, hint, ...children) {
+        const section = document.createElement('section');
+        section.className = 'items-section';
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        section.append(heading);
+        if (hint) {
+            const note = document.createElement('p');
+            note.className = 'items-section__hint';
+            note.textContent = hint;
+            section.append(note);
+        }
+        section.append(...children);
+        return section;
+    }
+
+    function createItemChip(item, { onRemove } = {}) {
+        const chip = document.createElement('span');
+        chip.className = 'item-chip';
+        chip.textContent = `${item.name} · ${item.uses.toLocaleString()}건`;
+        if (onRemove) {
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'item-chip__remove';
+            remove.setAttribute('aria-label', `${item.name} 묶음 풀기`);
+            remove.append(iconElement('close'));
+            remove.addEventListener('click', onRemove);
+            chip.append(remove);
+        }
+        return chip;
+    }
+
+    function createItemInput(value, label, listId) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'item-input';
+        input.value = value;
+        input.maxLength = 100;
+        input.setAttribute('aria-label', label);
+        input.placeholder = label;
+        if (listId) input.setAttribute('list', listId);
+        return input;
+    }
+
+    function createItemButton(label, onClick, variant = 'btn-tonal') {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `btn ${variant}`;
+        button.textContent = label;
+        button.addEventListener('click', async () => {
+            button.disabled = true;
+            try {
+                await onClick();
+            } catch (err) {
+                showToast(err.message, { tone: 'danger' });
+            } finally {
+                button.disabled = false;
+            }
+        });
+        return button;
+    }
+
+    async function saveAliases(aliases, message) {
+        await api.saveDescriptionAliases(aliases);
+        aliasMapPromise = null;
+        loadDescriptionSuggestions();
+        showToast(message);
+        await loadItemManagement();
+        if (currentView !== 'daily') refreshCurrentView();
+    }
+
+    async function loadItemManagement() {
+        if (!itemsPanel) return;
+        itemsPanel.replaceChildren(createEmptyCompact('적요 목록을 불러오는 중...'));
+        let data;
+        try {
+            data = await api.listDescriptions();
+        } catch (err) {
+            itemsPanel.replaceChildren(createEmptyCompact(`적요 목록을 불러오지 못했어요. (${err.message})`));
+            return;
+        }
+        const { names, suggestions, nonItems, mapped, notAnItem } = data;
+        const listId = 'itemsNameList';
+        const datalist = document.createElement('datalist');
+        datalist.id = listId;
+        datalist.append(...names.map((item) => new Option(item.name)));
+
+        // 1) 묶음 추천: 이름만 조금 다른 적요들
+        const suggestionCards = suggestions.map((group) => {
+            const card = document.createElement('div');
+            card.className = 'item-group';
+            const variants = document.createElement('div');
+            variants.className = 'item-group__variants';
+            variants.append(...group.items.map((item) => createItemChip(item)));
+            const input = createItemInput(group.suggested, '대표 이름', listId);
+            const action = document.createElement('div');
+            action.className = 'item-group__action';
+            action.append(input, createItemButton('하나로 묶기', async () => {
+                const canonical = input.value.trim();
+                if (!canonical) throw new Error('대표 이름을 입력해 주세요.');
+                const aliases = group.items
+                    .filter((item) => item.name !== canonical)
+                    .map((item) => ({ alias: item.name, canonical }));
+                if (group.items.some((item) => item.name === canonical && item.canonical)) aliases.push({ alias: canonical, canonical: '' });
+                await saveAliases(aliases, `${aliases.length}개 적요를 "${canonical}"(으)로 묶었어요.`);
+            }, 'btn-filled'));
+            card.append(variants, action);
+            return card;
+        });
+
+        // 2) 결제수단·메모처럼 보이는 적요
+        const nonItemRows = nonItems.map((item) => {
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.append(createItemChip(item), createItemButton('품목 아님으로 표시', () => saveAliases([{ alias: item.name, canonical: notAnItem }], `"${item.name}"은(는) 품목 분석에서 빼요.`)));
+            return row;
+        });
+
+        // 3) 직접 묶기
+        const manual = document.createElement('div');
+        manual.className = 'item-group__action item-manual';
+        const aliasInput = createItemInput('', '바꿀 적요 (입력된 이름)', listId);
+        const canonicalInput = createItemInput('', '대표 이름', listId);
+        manual.append(aliasInput, canonicalInput, createItemButton('묶기', async () => {
+            const alias = aliasInput.value.trim();
+            const canonical = canonicalInput.value.trim();
+            if (!alias || !canonical) throw new Error('바꿀 적요와 대표 이름을 모두 입력해 주세요.');
+            await saveAliases([{ alias, canonical }], `"${alias}" → "${canonical}"(으)로 묶었어요.`);
+        }));
+
+        // 4) 묶어 둔 적요 (대표 이름별)
+        const byCanonical = new Map();
+        mapped.forEach((item) => {
+            if (!byCanonical.has(item.canonical)) byCanonical.set(item.canonical, []);
+            byCanonical.get(item.canonical).push(item);
+        });
+        const mappedRows = [...byCanonical.entries()].map(([canonical, items]) => {
+            const row = document.createElement('div');
+            row.className = 'item-row item-row--mapped';
+            const title = document.createElement('strong');
+            title.textContent = canonical;
+            const chips = document.createElement('div');
+            chips.className = 'item-group__variants';
+            chips.append(...items.map((item) => createItemChip(item, {
+                onRemove: () => saveAliases([{ alias: item.name, canonical: '' }], `"${item.name}" 묶음을 풀었어요.`).catch((err) => showToast(err.message, { tone: 'danger' }))
+            })));
+            row.append(title, chips);
+            return row;
+        });
+
+        itemsPanel.replaceChildren(
+            datalist,
+            createItemSection('묶음 추천', '이름만 조금 다른 적요들이에요. 대표 이름을 확인하고 묶어 주세요.',
+                ...(suggestionCards.length ? suggestionCards : [createEmptyCompact('추천할 묶음이 없어요.')])),
+            createItemSection('품목이 아닌 적요', '결제수단·메모처럼 보이는 적요는 품목 순위와 AI 리포트에서 뺄 수 있어요. (매출 합계에는 그대로 포함)',
+                ...(nonItemRows.length ? nonItemRows : [createEmptyCompact('해당하는 적요가 없어요.')])),
+            createItemSection('직접 묶기', '추천에 없는 적요도 대표 이름을 정해 묶을 수 있어요.', manual),
+            createItemSection(`묶어 둔 적요 (${mapped.length.toLocaleString()}개)`, '× 를 누르면 묶음을 풀어요.',
+                ...(mappedRows.length ? mappedRows : [createEmptyCompact('아직 묶은 적요가 없어요.')]))
+        );
     }
 
     async function loadUserManagement() {
@@ -1738,6 +1938,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('내역을 수정했습니다.');
             } else {
                 await api.createTransaction(values);
+                rememberDescriptionSuggestion(values.description);
                 resetTransactionForm();
                 showToast(`입력 완료 · ${values.description} ${formatWon(summary.sales)}`);
             }

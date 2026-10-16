@@ -7,6 +7,7 @@ import { pool, runMigrations, waitForDatabase } from './db.js';
 import { HttpError } from './http.js';
 import adminRoutes from './routes/admin.js';
 import aiRoutes from './routes/ai.js';
+import descriptionRoutes from './routes/descriptions.js';
 import authRoutes from './routes/auth.js';
 import reportRoutes from './routes/reports.js';
 import transactionRoutes from './routes/transactions.js';
@@ -79,6 +80,7 @@ api.use('/auth', authRoutes);
 api.use('/transactions', transactionRoutes);
 api.use('/admin', adminRoutes);
 api.use('/ai', aiRoutes);
+api.use('/descriptions', descriptionRoutes);
 api.use('/', reportRoutes);
 
 api.use((req, res) => {

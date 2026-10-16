@@ -2,6 +2,7 @@
 // 숫자(증감률 포함)는 모두 여기서 계산하고, AI 는 이 숫자를 해석하는 문장만 쓴다.
 // 개인정보가 섞일 수 있는 비고(remark)·특기사항은 보내지 않는다.
 import { query } from '../db.js';
+import { ALIAS_JOIN_SQL, CANONICAL_SQL, NOT_AN_ITEM } from '../descriptions.js';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const OPERATING = '(total_people > 0 OR total_sales > 0 OR total_expense > 0)';
@@ -62,12 +63,12 @@ async function topItems(ranges, limit = 8) {
   const [current, previousMonth, lastYear] = ranges;
   const { rows } = await query(
     `WITH items AS (
-       SELECT btrim(description) AS name,
-              transaction_date,
-              cash_income + card_income AS sales,
-              customer_count
-         FROM transactions
-        WHERE deleted_at IS NULL AND btrim(description) <> ''
+       SELECT ${CANONICAL_SQL} AS name,
+              t.transaction_date,
+              t.cash_income + t.card_income AS sales,
+              t.customer_count
+         FROM transactions t ${ALIAS_JOIN_SQL}
+        WHERE t.deleted_at IS NULL AND btrim(t.description) <> ''
      )
      SELECT name,
             SUM(sales) FILTER (WHERE transaction_date BETWEEN $1 AND $2) AS sales,
@@ -75,28 +76,30 @@ async function topItems(ranges, limit = 8) {
             COALESCE(SUM(sales) FILTER (WHERE transaction_date BETWEEN $3 AND $4), 0) AS previous_month_sales,
             COALESCE(SUM(sales) FILTER (WHERE transaction_date BETWEEN $5 AND $6), 0) AS last_year_sales
        FROM items
-      WHERE transaction_date BETWEEN $1 AND $2
+      WHERE name <> $8
+        AND (transaction_date BETWEEN $1 AND $2
          OR transaction_date BETWEEN $3 AND $4
-         OR transaction_date BETWEEN $5 AND $6
+         OR transaction_date BETWEEN $5 AND $6)
       GROUP BY name
      HAVING COALESCE(SUM(sales) FILTER (WHERE transaction_date BETWEEN $1 AND $2), 0) > 0
       ORDER BY 2 DESC
       LIMIT $7`,
-    [...current, ...previousMonth, ...lastYear, limit]
+    [...current, ...previousMonth, ...lastYear, limit, NOT_AN_ITEM]
   );
   return rows;
 }
 
 async function namedTopItems(start, end, limit = 5) {
   const { rows } = await query(
-    `SELECT btrim(description) AS name, SUM(cash_income + card_income) AS sales
-       FROM transactions
-      WHERE deleted_at IS NULL AND btrim(description) <> '' AND transaction_date BETWEEN $1 AND $2
+    `SELECT ${CANONICAL_SQL} AS name, SUM(t.cash_income + t.card_income) AS sales
+       FROM transactions t ${ALIAS_JOIN_SQL}
+      WHERE t.deleted_at IS NULL AND btrim(t.description) <> '' AND t.transaction_date BETWEEN $1 AND $2
+        AND ${CANONICAL_SQL} <> $4
       GROUP BY 1
-     HAVING SUM(cash_income + card_income) > 0
+     HAVING SUM(t.cash_income + t.card_income) > 0
       ORDER BY 2 DESC
       LIMIT $3`,
-    [start, end, limit]
+    [start, end, limit, NOT_AN_ITEM]
   );
   return rows.map((row) => ({ name: row.name, sales: row.sales }));
 }

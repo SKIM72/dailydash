@@ -221,7 +221,8 @@
                         <div class="field-group">
                             <div class="field field--lead">
                                 <i data-icon="note" class="field__lead"></i>
-                                <input type="text" id="desc" placeholder="예: 미숫가루, 돌배즙" autocomplete="off" required>
+                                <input type="text" id="desc" placeholder="예: 미숫가루, 돌배즙" autocomplete="off" list="descSuggestions" required>
+                                <datalist id="descSuggestions"></datalist>
                                 <label for="desc">적요 (현금 & 카드)</label>
                             </div>
                         </div>
@@ -589,6 +590,7 @@
                 <button type="button" class="tab" role="tab" aria-selected="false" data-tab="settings"><i data-icon="setting"></i>화면 설정</button>
                 <button type="button" class="tab" role="tab" aria-selected="false" data-tab="history"><i data-icon="clock"></i>작업 이력</button>
                 <button type="button" class="tab hidden-view" role="tab" aria-selected="false" data-tab="users" id="usersTabBtn"><i data-icon="users"></i>사용자 관리</button>
+                <button type="button" class="tab hidden-view" role="tab" aria-selected="false" data-tab="items" id="itemsTabBtn"><i data-icon="ranking"></i>적요 정리</button>
             </div>
 
             <section class="tab-panel" data-tab-panel="account" role="tabpanel">
@@ -680,6 +682,11 @@
                         </table>
                     </div>
                 </div>
+            </section>
+
+            <section class="tab-panel" data-tab-panel="items" role="tabpanel" hidden>
+                <p class="items-intro">같은 상품을 다르게 적은 적요를 하나로 묶으면 품목 순위와 AI 리포트가 정확해져요. 입력된 원본 내역은 바뀌지 않고, 언제든 다시 풀 수 있어요.</p>
+                <div id="itemsPanel" class="items-panel"><div class="empty-compact">불러오는 중...</div></div>
             </section>
         </div>
     </div>

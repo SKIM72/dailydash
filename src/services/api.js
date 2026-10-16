@@ -145,6 +145,12 @@ export const api = {
   auditLogs: (limit = 30) => get(`/audit-logs?${qs({ limit })}`).then((data) => data.logs),
   logExport: (label, details) => post('/audit-logs/export', { label, details }),
 
+  // 적요(품목 이름) 정리 - 자동완성 · 분석용 묶음표 · 관리자 묶기
+  descriptionSuggestions: () => get('/descriptions/suggestions').then((data) => data.names),
+  descriptionAliases: () => get('/descriptions/aliases'),
+  listDescriptions: () => get('/descriptions'),
+  saveDescriptionAliases: (aliases) => put('/descriptions/aliases', { aliases }),
+
   // AI 월간 리포트 (Gemini) - 만들기는 관리자만
   aiStatus: () => get('/ai/status'),
   getMonthlyAiReport: (month) => get(`/ai/monthly-report?${qs({ month })}`).then((data) => data.report),
