@@ -54,13 +54,21 @@ router.get('/', async (req, res) => {
   res.json({ transactions: rows });
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.post('/', async (req, res) => {
   const values = parseTransactionBody(req.body);
-  const row = await withTransaction(async (db) => {
+  // 오프라인으로 모아 둔 입력은 휴대폰이 붙인 고유 번호(client_id)와 함께 온다.
+  // 응답만 못 받고 다시 보내는 경우가 있어, 같은 번호면 새로 저장하지 않고 저장된 내역을 돌려준다.
+  const clientId = req.body?.client_id == null || req.body.client_id === '' ? null : String(req.body.client_id);
+  if (clientId !== null && !UUID_RE.test(clientId)) throw badRequest('client_id 형식이 올바르지 않습니다.');
+
+  const result = await withTransaction(async (db) => {
     const { rows } = await db.query(
       `INSERT INTO transactions
-         (transaction_date, description, customer_count, cash_income, cash_expense, card_income, remark1, remark2, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (transaction_date, description, customer_count, cash_income, cash_expense, card_income, remark1, remark2, created_by, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (client_id) DO NOTHING
        RETURNING ${TX_COLUMNS}`,
       [
         values.transaction_date,
@@ -71,14 +79,19 @@ router.post('/', async (req, res) => {
         values.card_income,
         values.remark1,
         values.remark2,
-        req.user.id
+        req.user.id,
+        clientId
       ]
     );
+    if (!rows.length) {
+      const existing = await db.query(`SELECT ${TX_COLUMNS} FROM transactions WHERE client_id = $1`, [clientId]);
+      return { transaction: existing.rows[0], duplicate: true };
+    }
     const { label, details } = describeTransaction(rows[0]);
     await writeAudit(db, req.user, '내역 입력', label, details, { after: rows[0] });
-    return rows[0];
+    return { transaction: rows[0], duplicate: false };
   });
-  res.status(201).json({ transaction: row });
+  res.status(result.duplicate ? 200 : 201).json(result);
 });
 
 router.patch('/:id', requireAdmin, async (req, res) => {

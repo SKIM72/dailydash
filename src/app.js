@@ -19,6 +19,7 @@ import { iconElement, iconSvg } from './shared/icons.js';
 import { installConfirmSwitch, installTextScaleSlider, isConfirmBeforeSave } from './shared/settings.js';
 import { installThemeControls } from './shared/theme.js';
 import { hideInstallEntriesWhenStandalone, registerServiceWorker } from './shared/pwa.js';
+import { OUTBOX_EVENT, addToOutbox, flushOutbox, newClientId, readOutbox, removeFromOutbox } from './shared/outbox.js';
 import {
     createSheet,
     installDrawer,
@@ -995,11 +996,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. 앱 초기화
     async function init() {
+        let startedOffline = false;
         try {
             currentUser = await getCurrentUser();
+            rememberLastUser(currentUser);
         } catch (err) {
-            if (err.status !== 401) await window.showAlert(`계정 정보를 확인하지 못했습니다.<br>${err.message}`);
-            return;
+            // 인터넷이 끊긴 채로 앱을 열면 마지막으로 로그인한 계정으로 열어 입력만은 할 수 있게 한다. (권한은 서버가 다시 확인)
+            const cached = err.code === 'NETWORK_ERROR' ? readLastUser() : null;
+            if (!cached) {
+                if (err.status !== 401) await window.showAlert(`계정 정보를 확인하지 못했습니다.<br>${err.message}`);
+                return;
+            }
+            currentUser = cached;
+            startedOffline = true;
         }
         if (currentUser.status !== 'approved') {
             await window.showAlert('아직 가입 승인이 완료되지 않은 계정입니다. 최고 관리자의 승인을 기다려주세요.');
@@ -1092,7 +1101,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('networkRetryBtn')?.addEventListener('click', () => refreshCurrentView());
         window.addEventListener('dailydash:network', (event) => {
             networkBanner?.classList.toggle('hidden-view', event.detail.reachable);
+            if (event.detail.reachable) sendOutbox();
         });
+        if (startedOffline) {
+            networkBanner?.classList.remove('hidden-view');
+            showToast('인터넷이 끊겨 있어요. 입력한 내역은 휴대폰에 임시 저장했다가 연결되면 보낼게요.', { tone: 'info', duration: 6000 });
+        }
+        installOutbox();
         window.addEventListener('scroll', () => {
             topAppBar?.classList.toggle('is-scrolled', window.scrollY > 4);
         }, { passive: true });
@@ -1245,6 +1260,80 @@ document.addEventListener('DOMContentLoaded', () => {
         button.append(iconElement(iconName), label);
         button.addEventListener('click', onClick);
         return button;
+    }
+
+    /* ---------------- 오프라인 입력 보관함 ---------------- */
+    const LAST_USER_KEY = 'dailydash-last-user';
+    const outboxBanner = document.getElementById('outboxBanner');
+    const outboxList = document.getElementById('outboxList');
+
+    function rememberLastUser(user) {
+        try {
+            localStorage.setItem(LAST_USER_KEY, JSON.stringify({ id: user.id, email: user.email, role: user.role, status: user.status }));
+        } catch {
+            /* 저장 공간을 못 쓰면 오프라인 시작만 안 될 뿐이다 */
+        }
+    }
+
+    function readLastUser() {
+        try {
+            const user = JSON.parse(localStorage.getItem(LAST_USER_KEY) || 'null');
+            return user?.email && user.status === 'approved' ? user : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function renderOutbox() {
+        if (!outboxBanner) return;
+        const items = readOutbox(currentUserEmail);
+        outboxBanner.classList.toggle('hidden-view', items.length === 0);
+        setText('outboxTitle', `보내지 못한 입력 ${items.length.toLocaleString()}건`);
+        outboxList.replaceChildren(...items.map((item) => {
+            const { values } = item;
+            const li = document.createElement('li');
+            li.className = `outbox-item${item.error ? ' has-error' : ''}`;
+            const text = document.createElement('span');
+            const sales = Number(values.cash_income || 0) + Number(values.card_income || 0);
+            text.textContent = `${values.transaction_date.slice(5)} · ${values.description} · ${formatWon(sales)}${item.error ? ` - 보내지 못함: ${item.error}` : ''}`;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'icon-btn outbox-item__remove';
+            remove.setAttribute('aria-label', `${values.description} 임시 저장 지우기`);
+            remove.append(iconElement('close'));
+            remove.addEventListener('click', async () => {
+                if (!await window.showConfirm(`임시 저장한 "${values.description}" 내역을 지울까요?
+서버에는 저장되지 않은 내역이에요.`, { confirmLabel: '지우기' })) return;
+                removeFromOutbox(values.client_id);
+            });
+            li.append(text, remove);
+            return li;
+        }));
+    }
+
+    async function sendOutbox({ manual = false } = {}) {
+        if (readOutbox(currentUserEmail).length === 0) return;
+        const result = await flushOutbox(currentUserEmail, (values) => api.createTransaction(values));
+        if (!result) return;
+        const { sent, failed, remaining } = result;
+        if (sent > 0) {
+            showToast(`임시 저장한 ${sent.toLocaleString()}건을 서버로 보냈어요.`);
+            if (currentView === 'daily') loadDailyData(datePicker.value);
+        }
+        if (failed > 0) showToast(`${failed.toLocaleString()}건은 내용 문제로 보내지 못했어요. 목록을 확인해 주세요.`, { tone: 'danger', duration: 6000 });
+        else if (manual && sent === 0 && remaining > 0) showToast('아직 서버에 연결되지 않았어요. 연결되면 자동으로 보낼게요.', { tone: 'info' });
+    }
+
+    function installOutbox() {
+        renderOutbox();
+        window.addEventListener(OUTBOX_EVENT, renderOutbox);
+        window.addEventListener('online', () => sendOutbox());
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') sendOutbox();
+        });
+        setInterval(() => sendOutbox(), 60 * 1000);
+        document.getElementById('outboxSendBtn')?.addEventListener('click', () => sendOutbox({ manual: true }));
+        sendOutbox();
     }
 
     /* ---------------- 적요 정리 (관리자) ---------------- */
@@ -1973,7 +2062,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isMobileLayout()) entrySheet.close();
                 showToast('내역을 수정했습니다.');
             } else {
-                await api.createTransaction(values);
+                const payload = { ...values, client_id: newClientId() };
+                try {
+                    await api.createTransaction(payload);
+                } catch (err) {
+                    if (err.code !== 'NETWORK_ERROR') throw err;
+                    addToOutbox(currentUserEmail, payload);
+                    rememberDescriptionSuggestion(values.description);
+                    resetTransactionForm();
+                    showToast('인터넷이 끊겨 휴대폰에 임시 저장했어요. 연결되면 자동으로 보낼게요.', { tone: 'info', duration: 6000 });
+                    return;
+                }
                 rememberDescriptionSuggestion(values.description);
                 resetTransactionForm();
                 showToast(`입력 완료 · ${values.description} ${formatWon(summary.sales)}`);
@@ -3065,6 +3164,11 @@ document.addEventListener('DOMContentLoaded', () => {
 window.logout = async () => {
     if (await window.showConfirm('로그아웃 할까요?', { danger: false, confirmLabel: '로그아웃', icon: 'logout' })) {
         await api.logout().catch(() => {});
+        try {
+            localStorage.removeItem('dailydash-last-user');
+        } catch {
+            /* 무시 */
+        }
         window.location.replace('login.html');
     }
 };

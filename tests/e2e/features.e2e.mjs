@@ -136,11 +136,94 @@ async function testForecastAndSeasons(browser) {
   await ctx.close();
 }
 
+async function submitEntry(page, description, amount) {
+  if (!(await page.locator('#entryPanel.is-open').count())) {
+    await page.click('#entryFab');
+    await page.locator('#entryPanel.is-open').waitFor();
+  }
+  await page.fill('#desc', description);
+  await page.fill('#count', '1');
+  await page.fill('#cashIn', String(amount));
+  await page.click('#submitTransactionBtn');
+  await page.locator('#custom-confirm-modal').waitFor({ state: 'visible' });
+  await page.click('#confirm-yes-btn');
+}
+
+async function testOfflineOutbox(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' });
+  const page = await login(ctx);
+  watch(page, 'offline');
+  await page.locator('#txList .list-item, #txList .empty-state').first().waitFor();
+  const stamp = Date.now() % 100000;
+  const offlineDesc = `오프라인식혜${stamp}`;
+  const lostDesc = `응답분실${stamp}`;
+
+  // 1) 연결이 끊긴 채 저장 → 휴대폰 보관함
+  await ctx.setOffline(true);
+  await submitEntry(page, offlineDesc, 4000);
+  await page.locator('.toast-message', { hasText: '휴대폰에 임시 저장' }).waitFor();
+  await page.locator('#outboxBanner').waitFor({ state: 'visible' });
+  check('오프라인: 저장하면 휴대폰에 임시 저장 + 대기 배너', (await page.innerText('#outboxTitle')).includes('1건'));
+  await page.screenshot({ path: `${SHOTS}offline-outbox.png` });
+
+  // 다시 연결되면 자동으로 보낸다.
+  await ctx.setOffline(false);
+  await page.locator('.toast-message', { hasText: '서버로 보냈어요' }).waitFor({ timeout: 15000 });
+  await page.waitForFunction(() => (localStorage.getItem('dailydash-outbox-v1') || '[]') === '[]');
+  check('다시 연결되면 자동 전송 + 보관함 비움', await page.locator('#outboxBanner').isHidden());
+
+  // 2) 요청은 서버에 닿았는데 응답만 잃어버린 경우 → 다시 보내도 한 번만 저장
+  await page.route('**/api/transactions', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const body = route.request().postDataJSON();
+    if (body.description !== lostDesc) return route.continue();
+    await route.fetch();
+    await route.abort('failed');
+  });
+  await submitEntry(page, lostDesc, 5000);
+  await page.waitForFunction((desc) => (localStorage.getItem('dailydash-outbox-v1') || '').includes(desc), lostDesc);
+  await page.unrouteAll({ behavior: 'wait' });
+  const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('dailydash-outbox-v1') || '[]').map((item) => item.values.description));
+  check('응답 분실: 보관함에 들어감 (서버에는 이미 저장된 상태)', queued.length === 1 && queued[0] === lostDesc, queued.join(', '));
+
+  // 3) 다시 연결 → 자동/수동 전송 → 서버에 한 번씩만 저장 (연속 입력용으로 열려 있는 시트를 닫고)
+  await page.click('.entry-panel__close');
+  await page.locator('#entryPanel.is-open').waitFor({ state: 'detached' });
+  if (await page.locator('#outboxBanner').isVisible()) await page.click('#outboxSendBtn');
+  await page.locator('#outboxBanner').waitFor({ state: 'hidden', timeout: 15000 });
+  const rows = await sql('SELECT description, COUNT(*)::int AS count, COUNT(client_id)::int AS with_id FROM transactions WHERE description = ANY($1) GROUP BY description', [[offlineDesc, lostDesc]]);
+  const counts = Object.fromEntries(rows.map((row) => [row.description, row.count]));
+  check('다시 연결되면 전송 → 각각 정확히 1건 (중복 없음)', counts[offlineDesc] === 1 && counts[lostDesc] === 1, JSON.stringify(counts));
+  check('오프라인 입력에 고유 번호(client_id) 저장', rows.every((row) => row.with_id === 1));
+  await page.locator('#txList .list-item', { hasText: offlineDesc }).waitFor();
+  check('전송 후 오늘 목록에 표시', true);
+
+  // 4) 서버에 닿지 않는 상태로 앱 열기 → 마지막 계정으로 열리고 입력 가능
+  await page.route('**/api/**', (route) => route.abort('failed'));
+  await page.reload();
+  await page.locator('.toast-message', { hasText: '인터넷이 끊겨 있어요' }).waitFor();
+  check('오프라인으로 앱 열기: 마지막 계정으로 열림', page.url().includes('index.html'));
+  check('오프라인으로 앱 열기: 연결 끊김 배너 표시', await page.locator('#networkBanner').isVisible());
+  await page.unroute('**/api/**');
+
+  // 5) 직접 보내기(중복 번호)는 서버가 200 으로 기존 내역을 돌려준다
+  const duplicateStatus = await page.evaluate(async (desc) => {
+    const clientId = crypto.randomUUID();
+    const body = JSON.stringify({ transaction_date: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), description: desc, customer_count: 1, cash_income: 1000, card_income: 0, cash_expense: 0, remark1: '', remark2: '', client_id: clientId });
+    const first = await fetch('api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    const second = await fetch('api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    return `${first.status}/${second.status}/${(await second.json()).duplicate}`;
+  }, `중복확인${stamp}`);
+  check('같은 번호로 두 번 보내면 두 번째는 저장 안 함', duplicateStatus === '201/200/true', duplicateStatus);
+  await ctx.close();
+}
+
 const browser = await launchBrowser();
 try {
   await testDescriptionAliases(browser);
   await testMemberCannotEditAliases(browser);
   await testForecastAndSeasons(browser);
+  await testOfflineOutbox(browser);
 } catch (err) {
   reporter.fail(err);
 } finally {

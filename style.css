@@ -889,6 +889,14 @@ html[data-theme="dark"] .compare-row--reference { background: transparent; }
 .compare-delta.is-negative { background: var(--md-error-container); color: var(--md-on-error-container); }
 .compare-row__note { font-size: 0.75rem; color: var(--md-on-surface-variant); }
 
+/* 오프라인 입력 보관함 (배너) */
+.outbox-list { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; }
+.outbox-list:empty { display: none; }
+.outbox-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.125rem 0 0.125rem 0.625rem; border-radius: var(--shape-sm); background: color-mix(in srgb, currentColor 8%, transparent); font-size: 0.8125rem; font-weight: 600; word-break: keep-all; }
+.outbox-item.has-error { color: var(--md-error); }
+.outbox-item__remove { width: 2rem; height: 2rem; color: inherit; }
+.outbox-item__remove .icon { width: 1rem; height: 1rem; }
+
 /* 월말 예상 (기간 비교 카드) */
 .compare-row--forecast { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
 html[data-theme="dark"] .compare-row--forecast { background: var(--md-tertiary-container); }

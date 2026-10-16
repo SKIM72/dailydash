@@ -118,6 +118,15 @@
                     <div class="banner__actions"><button type="button" class="btn btn-text" id="networkRetryBtn"><i data-icon="refresh"></i>다시 시도</button></div>
                 </div>
             </section>
+            <section id="outboxBanner" class="banner banner--warning hidden-view" role="status">
+                <span class="banner__icon"><i data-icon="archive"></i></span>
+                <div class="banner__content">
+                    <div class="banner__head"><strong id="outboxTitle">보내지 못한 입력</strong></div>
+                    <p class="banner__text">인터넷이 끊겨 휴대폰에 임시 저장한 내역이에요. 연결되면 자동으로 보내요.</p>
+                    <ul class="outbox-list" id="outboxList"></ul>
+                    <div class="banner__actions"><button type="button" class="btn btn-text" id="outboxSendBtn"><i data-icon="send"></i>지금 보내기</button></div>
+                </div>
+            </section>
         </div>
 
         <!-- ============ 일일 내역 ============ -->
