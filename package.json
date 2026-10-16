@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "icons": "node scripts/build-icons.mjs",
-    "apk": "node scripts/build-apk.mjs"
+    "apk": "node scripts/build-apk.mjs",
+    "test:e2e": "bash tests/e2e/run-ci.sh"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "iconsax-react": "^0.0.8",
+    "playwright": "1.63.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^6.4.4"

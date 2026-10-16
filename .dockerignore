@@ -9,3 +9,5 @@ docs
 .env.*
 *.log
 android
+tests
+server/test

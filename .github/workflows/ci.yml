@@ -54,3 +54,55 @@ jobs:
             -d '{"email":"ci-admin@example.com","password":"ci-password-123"}' http://127.0.0.1:3000/api/auth/login
           curl -fsS -b /tmp/jar "http://127.0.0.1:3000/api/summary/daily?start=2026-01-01&end=2026-01-31"
           curl -fsS http://127.0.0.1:3000/login.html -o /dev/null
+
+  # 화면 E2E: 실제 Postgres + 서버 + 가짜 Gemini 로 핵심 기능을 브라우저(Chromium)에서 확인한다.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: dailydash
+          POSTGRES_USER: dailydash
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dailydash -d dailydash"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://dailydash:ci-password@127.0.0.1:5432/dailydash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci
+          npm --prefix server ci
+          npx playwright install --with-deps chromium
+
+      - name: Build web
+        run: npm run build
+
+      - name: Server unit tests
+        run: npm --prefix server test
+
+      - name: E2E
+        run: bash tests/e2e/run-ci.sh
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: tests/e2e/shots/
+          retention-days: 7
