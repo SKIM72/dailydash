@@ -150,6 +150,7 @@ export const api = {
   descriptionAliases: () => get('/descriptions/aliases'),
   listDescriptions: () => get('/descriptions'),
   saveDescriptionAliases: (aliases) => put('/descriptions/aliases', { aliases }),
+  itemSeasons: (item) => get(`/descriptions/seasons${item ? `?${qs({ item })}` : ''}`),
 
   // AI 월간 리포트 (Gemini) - 만들기는 관리자만
   aiStatus: () => get('/ai/status'),

@@ -20,3 +20,16 @@ test('결제수단·메모처럼 보이는 적요를 알아본다', () => {
   assert.equal(looksLikeNonItem('계좌 이체'), true);
   assert.equal(looksLikeNonItem('돌배즙'), false);
 });
+
+test('성수기는 지난 해들의 월평균이 큰 3개월이다', async () => {
+  const { findSeason } = await import('../src/descriptions.js');
+  const months = {
+    2024: [5, 5, 50, 5, 5, 90, 5, 5, 5, 5, 5, 40],
+    2025: [5, 5, 70, 5, 5, 80, 5, 5, 5, 5, 5, 30],
+    2026: [5, 5, 99, 5, 5, 0, 0, 0, 0, 0, 0, 0]
+  };
+  const { peakMonths, seasonTotals } = findSeason(months, [2024, 2025, 2026], 2026);
+  assert.deepEqual(peakMonths, [3, 6, 12]);
+  assert.equal(seasonTotals[2025], 70 + 80 + 30);
+  assert.equal(seasonTotals[2026], 99);
+});

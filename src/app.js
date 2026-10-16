@@ -5,6 +5,7 @@ import { showToast } from './shared/toast.js';
 import { appendCell, setText } from './shared/dom.js';
 import { formatCommas, formatPercent, formatWon, parseCommas } from './shared/format.js';
 import { formatDateKey, getDayName, getKstToday, getPreviousMonth, parseDateKey } from './shared/date.js';
+import { FORECAST_METHOD_LABELS, forecastMonthEnd } from '../server/src/forecast.js';
 import {
     analyzeSalesFlow,
     buildDailySummaryFromView,
@@ -928,14 +929,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const stats = document.createElement('div');
             stats.className = 'compare-row__stats';
             const { summary, comparison } = row;
-            stats.append(
-                createCompareStat('매출', formatCompactWon(summary.total), comparison && createCompareDelta(currentLabel, comparison.rate, comparison.diff)),
-                createCompareStat(
-                    `영업일당 · ${summary.operatingDays.toLocaleString()}일`,
-                    summary.operatingDays > 0 ? formatCompactWon(summary.averageSales) : '-',
-                    comparison && createCompareDelta(currentLabel, comparison.averageRate, comparison.averageDiff)
-                )
-            );
+            if (row.stats) {
+                stats.append(...row.stats.map((stat) => createCompareStat(stat.label, stat.value, stat.delta)));
+            } else {
+                stats.append(
+                    createCompareStat('매출', formatCompactWon(summary.total), comparison && createCompareDelta(currentLabel, comparison.rate, comparison.diff)),
+                    createCompareStat(
+                        `영업일당 · ${summary.operatingDays.toLocaleString()}일`,
+                        summary.operatingDays > 0 ? formatCompactWon(summary.averageSales) : '-',
+                        comparison && createCompareDelta(currentLabel, comparison.averageRate, comparison.averageDiff)
+                    )
+                );
+            }
             item.append(head, stats);
             if (row.note) {
                 const note = document.createElement('p');
@@ -945,6 +950,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return item;
         }));
+    }
+
+    // 이번 달 마감 예상 카드 (서버 AI 리포트와 같은 계산: server/src/forecast.js)
+    function buildForecastRows({ compareSummary, lastYearSummary, lastYearFullSummary, compareDay, lastDay, month, startDate, endDate }) {
+        const forecast = forecastMonthEnd({
+            salesToDate: compareSummary.total,
+            operatingDaysToDate: compareSummary.operatingDays,
+            elapsedDays: compareDay,
+            daysInMonth: lastDay,
+            lastYearSalesToDate: lastYearSummary.total,
+            lastYearSalesFullMonth: lastYearFullSummary.total
+        });
+        if (!forecast || forecast.method === 'actual') return [];
+        const lastYearTotal = lastYearFullSummary.total;
+        const diff = forecast.sales - lastYearTotal;
+        return [{
+            label: '이번 달 예상 마감',
+            start: startDate,
+            end: endDate,
+            kind: 'forecast',
+            stats: [
+                {
+                    label: '예상 매출',
+                    value: `약 ${formatCompactWon(forecast.sales)}`,
+                    delta: lastYearTotal > 0 ? createCompareDelta(`작년 ${month}월보다`, (diff / lastYearTotal) * 100, diff) : null
+                },
+                { label: `남은 ${forecast.remainingDays}일 예상`, value: `+${formatCompactWon(forecast.sales - compareSummary.total)}` }
+            ],
+            note: `${FORECAST_METHOD_LABELS[forecast.method]}으로 계산한 추정치예요.`
+        }];
     }
 
     function getPreviousRange(startStr, endStr) {
@@ -1284,6 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast(message);
         await loadItemManagement();
         if (currentView !== 'daily') refreshCurrentView();
+        if (seasonLoaded) loadItemSeasons(seasonSelect?.value);
     }
 
     async function loadItemManagement() {
@@ -2060,6 +2096,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadMonthlyData(monthPicker.value);
         } else if (tabName === 'total') {
             loadTotalRangeData();
+            if (!seasonLoaded) loadItemSeasons();
         }
     }
 
@@ -2347,15 +2384,19 @@ document.addEventListener('DOMContentLoaded', () => {
             setText('monthOperatingDays', `${summary.operatingDays.toLocaleString()}일`);
             setText('monthlyDetailMeta', `${summary.operatingDays.toLocaleString()}영업일 · ${formatWon(summary.total)}`);
             const currentLabel = isCurrentMonth ? '이번 달' : `${month}월`;
+            const lastYearFullSummary = summarizeDailyMap(lastYearDaily);
             renderComparePanel('monthCompareList', [
                 { label: isCurrentMonth ? '이번 달 (오늘까지)' : `${year}년 ${month}월`, start: startDate, end: compareEnd, summary: compareSummary, kind: 'current' },
+                ...(isCurrentMonth ? buildForecastRows({
+                    compareSummary, lastYearSummary, lastYearFullSummary, compareDay, lastDay, month, startDate, endDate
+                }) : []),
                 { label: monthComparison.label, start: prevStartDate, end: prevEndDate, summary: prevSummary, comparison: monthComparison },
                 { label: yearComparison.label, start: lastYearStart, end: lastYearCompareEnd, summary: lastYearSummary, comparison: yearComparison },
                 ...(isCurrentMonth ? [{
                     label: `작년 ${month}월 전체`,
                     start: lastYearStart,
                     end: lastYearEnd,
-                    summary: summarizeDailyMap(lastYearDaily),
+                    summary: lastYearFullSummary,
                     kind: 'reference',
                     note: '이번 달 마감 목표로 참고하세요.'
                 }] : [])
@@ -2669,6 +2710,107 @@ document.addEventListener('DOMContentLoaded', () => {
                 weekdayWrap.appendChild(barRow);
             });
         }
+    }
+
+    /* ---------------- 품목 시즌 비교 (통계 분석) ---------------- */
+    const seasonSelect = document.getElementById('seasonItemSelect');
+    const seasonTable = document.getElementById('seasonTable');
+    const seasonSummary = document.getElementById('seasonSummary');
+    let seasonLoaded = false;
+    let seasonSeq = 0;
+
+    seasonSelect?.addEventListener('change', () => loadItemSeasons(seasonSelect.value));
+
+    async function loadItemSeasons(item) {
+        if (!seasonTable) return;
+        const seq = ++seasonSeq;
+        seasonLoaded = true;
+        seasonSummary.textContent = '시즌 자료를 불러오는 중...';
+        try {
+            const data = await api.itemSeasons(item);
+            if (seq === seasonSeq) renderItemSeasons(data);
+        } catch (err) {
+            if (seq === seasonSeq) seasonSummary.textContent = `시즌 자료를 불러오지 못했어요. (${err.message})`;
+        }
+    }
+
+    function formatMonths(list) {
+        return list.map((month) => `${month}월`).join('·');
+    }
+
+    function describeSeason({ item, years, currentMonth, months, peakMonths }) {
+        if (peakMonths.length === 0) return `${item}의 최근 3년 월별 매출이에요.`;
+        const [previousYear, thisYear] = years.slice(-2);
+        const sumOf = (year, list) => list.reduce((sum, month) => sum + (months[year]?.[month - 1] || 0), 0);
+        const parts = [`${item}은(는) ${formatMonths(peakMonths)}에 매출이 많아요.`];
+        const passed = peakMonths.filter((month) => month <= currentMonth);
+        if (passed.length > 0) {
+            const thisSum = sumOf(thisYear, passed);
+            const previousSum = sumOf(previousYear, passed);
+            if (previousSum > 0) {
+                const rate = Math.round(((thisSum - previousSum) / previousSum) * 100);
+                const inProgress = passed.includes(currentMonth) ? ' (이번 달은 오늘까지)' : '';
+                parts.push(`올해 ${formatMonths(passed)} 매출은 작년 같은 달보다 ${rate >= 0 ? '+' : ''}${rate}%예요${inProgress}.`);
+            }
+        }
+        const upcoming = peakMonths.filter((month) => month > currentMonth);
+        if (upcoming.length > 0) {
+            parts.push(`다가오는 성수기 ${formatMonths(upcoming)}에 작년에는 ${formatCompactWon(sumOf(previousYear, upcoming))}을 팔았어요.`);
+        }
+        return parts.join(' ');
+    }
+
+    function renderItemSeasons(data) {
+        const { items, item, years, currentMonth, months, peakMonths, seasonTotals } = data;
+        if (!item) {
+            seasonSummary.textContent = '최근 3년 동안 품목 매출이 없어요.';
+            seasonSelect.replaceChildren();
+            seasonTable.replaceChildren();
+            return;
+        }
+        seasonSelect.replaceChildren(...items.map((entry) => new Option(`${entry.name} · ${formatCompactWon(entry.sales)}`, entry.name, false, entry.name === item)));
+        if (!items.some((entry) => entry.name === item)) seasonSelect.prepend(new Option(item, item, true, true));
+
+        const thisYear = years[years.length - 1];
+        const max = Math.max(1, ...years.flatMap((year) => months[year]));
+        const shortWon = (value) => formatCompactWon(value).replace(/원$/, '');
+
+        const thead = document.createElement('thead');
+        const headRow = thead.insertRow();
+        const corner = document.createElement('th');
+        corner.textContent = '연도';
+        headRow.append(corner);
+        for (let month = 1; month <= 12; month += 1) {
+            const th = document.createElement('th');
+            th.textContent = `${month}월`;
+            if (peakMonths.includes(month)) th.className = 'is-peak';
+            headRow.append(th);
+        }
+        const totalHead = document.createElement('th');
+        totalHead.textContent = '성수기 합계';
+        headRow.append(totalHead);
+
+        const tbody = document.createElement('tbody');
+        years.forEach((year) => {
+            const row = tbody.insertRow();
+            const yearCell = document.createElement('th');
+            yearCell.scope = 'row';
+            yearCell.textContent = String(year);
+            row.append(yearCell);
+            months[year].forEach((value, index) => {
+                const cell = row.insertCell();
+                const future = year === thisYear && index + 1 > currentMonth;
+                cell.textContent = future ? '·' : value > 0 ? shortWon(value) : '-';
+                if (!future && value > 0) cell.style.setProperty('--heat', (value / max).toFixed(3));
+                if (peakMonths.includes(index + 1)) cell.classList.add('is-peak');
+                if (future) cell.classList.add('is-future');
+            });
+            const total = row.insertCell();
+            total.className = 'season-total';
+            total.textContent = formatCompactWon(seasonTotals[year] || 0);
+        });
+        seasonTable.replaceChildren(thead, tbody);
+        seasonSummary.textContent = describeSeason(data);
     }
 
     async function loadTotalRangeData() {

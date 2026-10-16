@@ -2,22 +2,21 @@
 // 숫자(증감률 포함)는 모두 여기서 계산하고, AI 는 이 숫자를 해석하는 문장만 쓴다.
 // 개인정보가 섞일 수 있는 비고(remark)·특기사항은 보내지 않는다.
 import { query } from '../db.js';
+import { kstToday, lastDayOfMonth } from '../dates.js';
 import { ALIAS_JOIN_SQL, CANONICAL_SQL, NOT_AN_ITEM } from '../descriptions.js';
+import { FORECAST_METHOD_LABELS, forecastMonthEnd } from '../forecast.js';
+
+export { kstToday };
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const OPERATING = '(total_people > 0 OR total_sales > 0 OR total_expense > 0)';
 
 const pad = (value) => String(value).padStart(2, '0');
-const lastDayOfMonth = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 const monthKey = (year, month) => `${year}-${pad(month)}`;
 
 function shiftMonth(year, month, diff) {
   const index = year * 12 + (month - 1) + diff;
   return [Math.floor(index / 12), (index % 12) + 1];
-}
-
-export function kstToday() {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function rate(current, previous) {
@@ -164,6 +163,18 @@ export async function buildMonthlyFacts(month, today = kstToday()) {
     )
   ]);
 
+  function buildForecast() {
+    const forecast = forecastMonthEnd({
+      salesToDate: current.sales,
+      operatingDaysToDate: current.operatingDays,
+      elapsedDays: cutoffDay,
+      daysInMonth: lastDay,
+      lastYearSalesToDate: lastYear.sales,
+      lastYearSalesFullMonth: lastYearFull.sales
+    });
+    return forecast && { sales: forecast.sales, basis: FORECAST_METHOD_LABELS[forecast.method], note: '추정치입니다' };
+  }
+
   return {
     shop: '하늘향 (전통차·카페, 계절 상품 판매)',
     month,
@@ -173,7 +184,7 @@ export async function buildMonthlyFacts(month, today = kstToday()) {
     current,
     previousMonthSamePeriod: previousMonth,
     lastYearSamePeriod: lastYear,
-    ...(inProgress ? { lastYearFullMonth: lastYearFull } : {}),
+    ...(inProgress ? { lastYearFullMonth: lastYearFull, monthEndForecast: buildForecast() } : {}),
     comparisons: {
       vsPreviousMonthSamePeriod: compare(current, previousMonth),
       vsLastYearSamePeriod: compare(current, lastYear)

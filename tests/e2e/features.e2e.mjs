@@ -1,5 +1,5 @@
 // 새 기능 E2E: 적요 묶기 · 자동완성 · 월말 예상 · 품목 시즌 · 오프라인 입력 · 알림 설정
-import { BASE, SHOTS, closeDb, createReporter, launchBrowser, login, sql } from './config.mjs';
+import { BASE, SHOTS, closeDb, createReporter, kstToday, launchBrowser, login, sql } from './config.mjs';
 
 const reporter = createReporter('새 기능');
 const { check, watch } = reporter;
@@ -86,10 +86,61 @@ async function testMemberCannotEditAliases(browser) {
   await ctx.close();
 }
 
+async function testForecastAndSeasons(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR' });
+  const page = await login(ctx);
+  watch(page, 'admin-forecast');
+
+  // 월말 예상: 이번 달 마지막 날이 아니면 기간 비교에 "이번 달 예상 마감" 카드가 있다.
+  await page.click('#tabMonthly');
+  await page.locator('#monthCompareList .compare-row').nth(2).waitFor();
+  const today = kstToday();
+  const isLastDay = kstToday(1).slice(8, 10) === '01';
+  const forecast = page.locator('#monthCompareList .compare-row--forecast');
+  if (isLastDay) {
+    check('월말 예상: 마지막 날에는 예상 카드 없음', (await forecast.count()) === 0);
+  } else {
+    const text = await forecast.innerText();
+    check('월말 예상: "이번 달 예상 마감" 카드 표시', text.includes('이번 달 예상 마감') && text.includes('예상 매출') && text.includes('추정치'), text.replace(/\n/g, ' / '));
+    check('월말 예상: 작년 같은 달과 비교 칩', /작년 \d+월보다 [+-]\d+%/.test(text));
+  }
+  await page.locator('#monthCompareList').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${SHOTS}forecast.png` });
+
+  // 품목 시즌 비교
+  await page.click('#tabTotal');
+  await page.locator('#seasonTable tbody tr').first().waitFor();
+  const yearRows = await page.locator('#seasonTable tbody tr').count();
+  const monthHeaders = await page.locator('#seasonTable thead th').count();
+  const peaks = await page.locator('#seasonTable thead th.is-peak').count();
+  check('시즌 비교: 3개 연도 × 12개월 표 + 성수기 표시', yearRows === 3 && monthHeaders === 14 && peaks >= 1 && peaks <= 3, `${yearRows}행, 머리 ${monthHeaders}칸, 성수기 ${peaks}개`);
+  const options = await page.$$eval('#seasonItemSelect option', (list) => list.map((option) => option.value));
+  check('시즌 비교: 품목 선택 목록 (대표 이름 기준)', options.length >= 3 && !options.includes('카드'), options.slice(0, 6).join(', '));
+  const otherItem = options.find((name) => name !== options[0]);
+  await page.selectOption('#seasonItemSelect', otherItem);
+  await page.waitForFunction((name) => document.getElementById('seasonSummary').textContent.startsWith(name), otherItem);
+  check('시즌 비교: 품목을 바꾸면 표와 설명이 바뀜', (await page.inputValue('#seasonItemSelect')) === otherItem, otherItem);
+  const [{ sales: dbThisMonth }] = await sql(
+    `SELECT COALESCE(SUM(t.cash_income + t.card_income), 0) AS sales
+       FROM transactions t LEFT JOIN description_aliases a ON a.alias = btrim(t.description)
+      WHERE t.deleted_at IS NULL AND COALESCE(a.canonical, btrim(t.description)) = $1
+        AND t.transaction_date BETWEEN $2 AND $3`,
+    [otherItem, `${today.slice(0, 7)}-01`, today]
+  );
+  const thisYearRow = page.locator('#seasonTable tbody tr').last();
+  const monthCell = await thisYearRow.locator('td').nth(Number(today.slice(5, 7)) - 1).innerText();
+  check('시즌 비교: 이번 달 칸이 DB 합계와 맞음', dbThisMonth === 0 ? monthCell === '-' : monthCell !== '-' && monthCell !== '·', `${monthCell} / DB ${dbThisMonth}`);
+  await page.locator('.season-panel').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${SHOTS}seasons.png` });
+  check('시즌 비교: 가로 넘침 없음(표는 안에서만 스크롤)', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await ctx.close();
+}
+
 const browser = await launchBrowser();
 try {
   await testDescriptionAliases(browser);
   await testMemberCannotEditAliases(browser);
+  await testForecastAndSeasons(browser);
 } catch (err) {
   reporter.fail(err);
 } finally {

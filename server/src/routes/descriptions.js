@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { writeAudit } from '../audit.js';
 import { requireAdmin, requireUser } from '../auth.js';
 import { query, withTransaction } from '../db.js';
-import { ALIAS_JOIN_SQL, CANONICAL_SQL, NOT_AN_ITEM, looksLikeNonItem, suggestionKey } from '../descriptions.js';
+import { kstToday } from '../dates.js';
+import { ALIAS_JOIN_SQL, CANONICAL_SQL, NOT_AN_ITEM, findSeason, looksLikeNonItem, suggestionKey } from '../descriptions.js';
 import { badRequest } from '../http.js';
 
 const router = Router();
@@ -24,6 +25,46 @@ router.get('/suggestions', requireUser, async (req, res) => {
     [NOT_AN_ITEM]
   );
   res.json({ names: rows.map((row) => row.name) });
+});
+
+// 품목 시즌 비교: 최근 3년의 월별 매출(대표 이름 기준)과 성수기
+router.get('/seasons', requireUser, async (req, res) => {
+  const today = kstToday();
+  const currentYear = Number(today.slice(0, 4));
+  const years = [currentYear - 2, currentYear - 1, currentYear];
+  const since = `${years[0]}-01-01`;
+  const { rows: items } = await query(
+    `SELECT name, SUM(sales) AS sales FROM (
+       SELECT ${CANONICAL_SQL} AS name, t.cash_income + t.card_income AS sales
+         FROM transactions t ${ALIAS_JOIN_SQL}
+        WHERE t.deleted_at IS NULL AND btrim(t.description) <> '' AND t.transaction_date >= $1
+     ) used
+     WHERE name <> $2
+     GROUP BY name
+    HAVING SUM(sales) > 0
+     ORDER BY sales DESC
+     LIMIT 20`,
+    [since, NOT_AN_ITEM]
+  );
+  const requested = String(req.query.item || '').trim().slice(0, MAX_NAME);
+  const item = requested || items[0]?.name || null;
+  if (!item) return res.json({ items: [], item: null, years, months: {}, peakMonths: [], seasonTotals: {} });
+
+  const { rows } = await query(
+    `SELECT EXTRACT(YEAR FROM t.transaction_date)::int AS year,
+            EXTRACT(MONTH FROM t.transaction_date)::int AS month,
+            SUM(t.cash_income + t.card_income) AS sales
+       FROM transactions t ${ALIAS_JOIN_SQL}
+      WHERE t.deleted_at IS NULL AND ${CANONICAL_SQL} = $1 AND t.transaction_date BETWEEN $2 AND $3
+      GROUP BY 1, 2`,
+    [item, since, today]
+  );
+  const months = Object.fromEntries(years.map((year) => [year, Array(12).fill(0)]));
+  rows.forEach((row) => {
+    if (months[row.year]) months[row.year][row.month - 1] = row.sales;
+  });
+  const { peakMonths, seasonTotals } = findSeason(months, years, currentYear);
+  res.json({ items, item, years, currentMonth: Number(today.slice(5, 7)), months, peakMonths, seasonTotals });
 });
 
 // 분석용 묶음표 { 원래 적요: 대표 이름 }
