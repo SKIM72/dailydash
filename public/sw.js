@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dailydash-v39-reminders';
+const CACHE_NAME = 'dailydash-v40-1.0.0';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

@@ -1,6 +1,6 @@
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '1.0.0';
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
-export const APP_RELEASE_DATE = '2026.10.16';
+export const APP_RELEASE_DATE = '2026.10.17';
 
 export function renderVersionLabels(root = document) {
   root.querySelectorAll('[data-app-version]').forEach((element) => {
