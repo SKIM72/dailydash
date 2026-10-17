@@ -726,7 +726,7 @@ html[data-theme="dark"] .toast-danger .icon { color: var(--md-error-container); 
 .dock > * { pointer-events: auto; }
 .bottom-nav {
     flex: 1; max-width: 26rem; height: 4rem; padding: 0.3125rem;
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     border-radius: var(--shape-full);
 }
 .bottom-nav .nav-indicator { background: var(--glass-indicator); }
@@ -771,7 +771,10 @@ html[data-theme="dark"] .empty-compact, html[data-theme="dark"] .empty-state { b
    4. 레이아웃
    --------------------------------------------------------------------- */
 .app-shell { min-height: 100vh; }
-.app-main { min-height: 100vh; margin-left: calc(var(--drawer-width) + 1.5rem); display: flex; flex-direction: column; }
+/* overflow-x: clip — 화면 전환 때 새 화면이 옆에서 미끄러져 들어오며 잠깐 화면 밖으로 삐져나와도
+   페이지가 넓어지지 않게 한다. (넓어지면 모바일 Chrome 이 화면을 살짝 축소해 하단 메뉴바가 내려갔다 올라온다)
+   hidden 과 달리 스크롤 영역을 만들지 않아 상단 바의 sticky 는 그대로 동작한다. */
+.app-main { min-height: 100vh; margin-left: calc(var(--drawer-width) + 1.5rem); display: flex; flex-direction: column; overflow-x: clip; }
 .page {
     width: 100%; max-width: 90rem; margin: 0 auto;
     padding: 0.5rem 1.5rem 3rem;

@@ -1087,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('prevMonthBtn')?.addEventListener('click', () => shiftMonth(-1));
         document.getElementById('nextMonthBtn')?.addEventListener('click', () => shiftMonth(1));
 
-        // 화면 이동 (드로어 · 하단 내비게이션) 과 계정 동작 (드로어 · 계정 메뉴 · 하단 MY)
+        // 화면 이동 (드로어 · 하단 내비게이션) 과 계정 동작 (드로어 · 상단 프로필 메뉴)
         document.querySelectorAll('[data-nav]').forEach((button) => {
             button.addEventListener('click', () => switchTab(button.dataset.nav));
         });

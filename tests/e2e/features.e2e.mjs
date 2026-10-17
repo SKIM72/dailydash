@@ -84,7 +84,8 @@ async function testMemberCannotEditAliases(browser) {
   watch(page, 'staff-items');
   const status = await page.evaluate(async () => (await fetch('api/descriptions/aliases', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ aliases: [{ alias: 'a', canonical: 'b' }] }) })).status);
   check('직원: 적요 묶기 API 거부(403)', status === 403, String(status));
-  await page.tap('.bottom-nav__item[data-action="mypage"]');
+  await page.tap('#accountMenuBtn');
+  await page.tap('#accountMenu [data-action="mypage"]');
   await page.locator('#myPageTabs').waitFor();
   check('직원: 적요 정리 탭 숨김', await page.locator('#itemsTabBtn').isHidden());
   await ctx.close();
